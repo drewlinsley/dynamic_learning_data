@@ -1,19 +1,27 @@
 import os
+import json
+import sys
 import imageio
 from PIL import Image
 import numpy as np
 
+def generate_video(scenes):
+    render_path = "render"
+    assets_list = ["fgbg"]
 
-render_path = "render"
-cls_list = os.listdir(render_path)
-for cls_name in cls_list: 
-    cls_path = os.path.join(render_path, cls_name)
-    seq_list = os.listdir(cls_path)
-    for seq in seq_list: 
-        seq_path = os.path.join(cls_path, seq)
-        assets_list = ["fg", "fgbg", "mask"]
+    with open("dataloader/co3d_lists/co3d_list.json") as fp:
+        co3d_lists = json.load(fp)
+
+    cls_list = []
+    for scene in scenes:
+        if scene not in co3d_lists:
+            print(f"SCENE {scene} NOT IN CO3D_LISTS - SKIPPING")
+            continue
+        cls = co3d_lists[scene]
+        print(f"Processing {cls}, {scene}")
+        scene_path = os.path.join(render_path, cls, scene)
         for asset in assets_list:
-            asset_path = os.path.join(seq_path, asset)
+            asset_path = os.path.join(scene_path, asset)
             img_path_list = os.listdir(asset_path)
             img_path_list = sorted(img_path_list)
             img_list = []
@@ -22,8 +30,10 @@ for cls_name in cls_list:
                     continue
                 imgpath = os.path.join(asset_path, img)
                 img_list.append(np.asarray(Image.open(imgpath)))
-            imageio.mimwrite(os.path.join(asset_path, f"{seq}_{asset}.mp4"), img_list)
-        print(cls_name, seq)
-        break
-    break
+            imageio.mimwrite(os.path.join(asset_path, f"{scene}_{asset}.mp4"), img_list)
+        print(f"Completed processing {cls}, {scene}")
 
+
+if __name__ == "__main__":
+    scenes = sys.argv[1:]
+    generate_video(scenes)
