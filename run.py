@@ -48,6 +48,7 @@ def run(
     max_steps: int = 200000,
     precision: int = 32,
     # Logging
+    enable_wandb: bool = False,
     log_every_n_steps: int = 1000,
     progressbar_refresh_rate: int = 5,
     # Run Mode
@@ -90,15 +91,17 @@ def run(
     os.makedirs(logdir, exist_ok=True)
 
     # WANDB fails when using TPUs
-    wandb_logger = (
-        RetryingWandbLogger(
-            name=exp_name,
-            entity=entity,
-            project=model_name if proj_name is None else proj_name,
+    wandb_logger = None
+    if enable_wandb:
+        wandb_logger = (
+            RetryingWandbLogger(
+                name=exp_name,
+                entity=entity,
+                project=model_name if proj_name is None else proj_name,
+            )
+            if accelerator == "gpu"
+            else pl_loggers.TensorBoardLogger(save_dir=logdir, name=exp_name)
         )
-        if accelerator == "gpu"
-        else pl_loggers.TensorBoardLogger(save_dir=logdir, name=exp_name)
-    )
 
     seed_everything(seed, workers=True)
 
