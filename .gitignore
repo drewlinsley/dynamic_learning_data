@@ -25,3 +25,6 @@ tsdf_results/
 
 PeRFception-v1-*
 PeRFception-models
+
+*.swp
+*.swo
