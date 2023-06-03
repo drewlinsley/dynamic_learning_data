@@ -51,8 +51,7 @@ def cartesian_coords_from_spherical(azim_deg, elev_deg, radius):
     z = radius * np.cos(elev) * np.cos(azim)
     return trans_vec(x, y, z)
 
-def look_at_rotation(camera_position, at=np.array([0., 0., 0.])):
-    up = np.array([0., 1., 0.])
+def look_at_rotation(camera_position, at=np.array([0., 0., 0.]), up=np.array([0., 1., 0.])):
     z_axis = at - camera_position
     z_axis /= np.linalg.norm(z_axis)
     x_axis = np.cross(up, z_axis)
@@ -101,15 +100,8 @@ def scale_matrix_by_coeffs(matrix, coeffs):
     res = np.multiply(matrices.T, coeffs).T
     return res
 
-def spherical_trajectories(extrinsics):
-    # Extrinsics describes camera pose in world frame with OpenCV convention:
-    # z+ in, y+ down, x+ right
-    print(f"extrinsics shape: {extrinsics.shape}")
-    start_pose, end_pose = extrinsics[0, :, :], extrinsics[-1, :, :]
-    start_R, start_t = start_pose[:3, :3], start_pose[:3, 3]
-    end_R, end_t = end_pose[:3, :3], end_pose[:3, 3]
-    print(f"start_t: {start_t}\nend_t: {end_t}")
-
+def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
+    start_t, end_t = start_pos, end_pos
     start_t_r = np.linalg.norm(start_t)
     start_t_hat = start_t / start_t_r
     end_t_r = np.linalg.norm(end_t)
@@ -117,8 +109,20 @@ def spherical_trajectories(extrinsics):
 
     angle_rad = np.arccos(np.dot(start_t_hat, end_t_hat))
 
+    # Hack to check if the trajectory should make a full revolution
+    # Assumes all positions are roughly planar and only one revolution is made
+    if mid_pos is not None:
+        mid_t = mid_pos
+        a = np.cross(start_t, mid_t)
+        b = np.cross(mid_t, end_t)
+        is_aligned = np.dot(a, b) >= 0.
+        if not is_aligned:
+            angle_rad += 2*np.pi
+
     rot_axis = np.cross(start_t_hat, end_t_hat)
     rot_axis /= np.linalg.norm(rot_axis)
+    print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
+
     skew = np.array(
         [
             [0.0, -rot_axis[2], rot_axis[1]],
@@ -127,27 +131,37 @@ def spherical_trajectories(extrinsics):
         ]
     )
 
-    num_steps = 50
     angles = np.linspace(0., angle_rad, num_steps+1)
     radii = np.linspace(start_t_r, end_t_r, num_steps+1)
     rots =  np.eye(3) + \
-            scale_matrix_by_coeffs(skew, angles) + \
+            scale_matrix_by_coeffs(skew, np.sin(angles)) + \
             scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
-    print(f"angle shape: {angles.shape}")
-    print(f"rots shape: {rots.shape}")
 
     positions_hat = rots @ start_t_hat
     positions_hat /= np.linalg.norm(positions_hat, axis=-1, keepdims=True)
     positions = np.multiply(positions_hat.T, radii).T
+    return positions
+
+def spherical_trajectories(extrinsics):
+    # Extrinsics describes camera pose in world frame with OpenCV convention:
+    # z+ in, y+ down, x+ right
+    print(f"extrinsics shape: {extrinsics.shape}")
+    mid_idx = extrinsics.shape[0] // 2
+    start_t = extrinsics[0, :3, 3]
+    mid_t = extrinsics[mid_idx, :3, 3]
+    end_t = extrinsics[-1, :3, 3]
+    positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
+    print(f"positions shape: {positions.shape}")
 
     mats = []
-    for i in range(len(angles)):
+    for i in range(positions.shape[0]):
         t = positions[i, :]
+        #TODO: Figure out why up=[0, -1, 0] isn't correct
         R = look_at_rotation(t)
-        E = np.eye(4)[np.newaxis, ...]
-        E[0, :3, :3] = R
-        E[0, :3, 3] = t
-        mats.append(E)
+        E = np.eye(4)
+        E[:3, :3] = R
+        E[:3, 3] = t
+        mats.append(E[np.newaxis, ...])
 
     mats = np.vstack(mats)
     print(f"mats shape: {mats.shape}")
