@@ -10,7 +10,7 @@ import gin
 import torch
 
 from dataloader.random_pose import random_pose, pose_interp
-from dataloader.spherical_poses import spherical_poses
+from dataloader.spherical_poses import spherical_poses, spherical_trajectories
 from turbojpeg import TurboJPEG
 
 def find_files(dir, exts):
@@ -91,8 +91,9 @@ def load_co3d_data(
     max_image_dim: int,
     cam_scale_factor: float,
     # render_strategy: "spherical",
-    render_scene_interp: bool = False,
-    render_scene_spherical: bool = True,
+    render_scene_interp: bool = True,
+    render_scene_spherical: bool = False,
+    render_scene_trajectory: bool = False,
     render_random_pose: bool = False,
     interp_fac: int = 0,
     perturb_pose: float = 0.,
@@ -233,6 +234,8 @@ def load_co3d_data(
         render_poses = pose_interp(extrinsics[i_all], interp_fac)
     elif render_scene_spherical:
         render_poses = spherical_poses(sscale * cam_scale_factor * np.eye(4))
+    elif render_scene_trajectory:
+        render_poses = spherical_trajectories(extrinsics[i_all])
     else:
         raise NotImplementedError("Need a rendering strategy.")
     

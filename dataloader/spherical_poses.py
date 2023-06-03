@@ -82,13 +82,74 @@ def camera_to_world_transform(azim, elev, radius, torch_output=False):
 
 
 def spherical_poses(image_to_camera_transform):
-    azims = np.linspace(180.-45., 180.+45., 40+1)
-    elevs = np.sin(np.linspace(0., 2*np.pi, 40+1))*30.
+    # Example trajectory definition
+    # Ideal for rendering teddybear scene 101_11758_21048
+    azims = np.linspace(15., 360.-15., 50+1)
+    elevs = np.ones_like(azims)*40.
     camera_trajectory = zip(azims, elevs)
-    dist = 15.
+    dist = 10.
     return np.stack(
         [
             camera_to_world_transform(az, el, dist) @ image_to_camera_transform
             for az, el in camera_trajectory
         ], 0
     )
+
+def scale_matrix_by_coeffs(matrix, coeffs):
+    tile_shape = [len(coeffs)] + [1]*len(matrix.shape)
+    matrices = np.tile(matrix, tile_shape)
+    res = np.multiply(matrices.T, coeffs).T
+    return res
+
+def spherical_trajectories(extrinsics):
+    # Extrinsics describes camera pose in world frame with OpenCV convention:
+    # z+ in, y+ down, x+ right
+    print(f"extrinsics shape: {extrinsics.shape}")
+    start_pose, end_pose = extrinsics[0, :, :], extrinsics[-1, :, :]
+    start_R, start_t = start_pose[:3, :3], start_pose[:3, 3]
+    end_R, end_t = end_pose[:3, :3], end_pose[:3, 3]
+    print(f"start_t: {start_t}\nend_t: {end_t}")
+
+    start_t_r = np.linalg.norm(start_t)
+    start_t_hat = start_t / start_t_r
+    end_t_r = np.linalg.norm(end_t)
+    end_t_hat = end_t / end_t_r
+
+    angle_rad = np.arccos(np.dot(start_t_hat, end_t_hat))
+
+    rot_axis = np.cross(start_t_hat, end_t_hat)
+    rot_axis /= np.linalg.norm(rot_axis)
+    skew = np.array(
+        [
+            [0.0, -rot_axis[2], rot_axis[1]],
+            [rot_axis[2], 0.0, -rot_axis[0]],
+            [-rot_axis[1], rot_axis[0], 0.0],
+        ]
+    )
+
+    num_steps = 50
+    angles = np.linspace(0., angle_rad, num_steps+1)
+    radii = np.linspace(start_t_r, end_t_r, num_steps+1)
+    rots =  np.eye(3) + \
+            scale_matrix_by_coeffs(skew, angles) + \
+            scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
+    print(f"angle shape: {angles.shape}")
+    print(f"rots shape: {rots.shape}")
+
+    positions_hat = rots @ start_t_hat
+    positions_hat /= np.linalg.norm(positions_hat, axis=-1, keepdims=True)
+    positions = np.multiply(positions_hat.T, radii).T
+
+    mats = []
+    for i in range(len(angles)):
+        t = positions[i, :]
+        R = look_at_rotation(t)
+        E = np.eye(4)[np.newaxis, ...]
+        E[0, :3, :3] = R
+        E[0, :3, 3] = t
+        mats.append(E)
+
+    mats = np.vstack(mats)
+    print(f"mats shape: {mats.shape}")
+    print(f"*************************************")
+    return mats
