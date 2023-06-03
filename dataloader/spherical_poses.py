@@ -109,18 +109,36 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
 
     angle_rad = np.arccos(np.dot(start_t_hat, end_t_hat))
 
+    rot_axis = np.cross(start_t_hat, end_t_hat)
+    rot_axis /= np.linalg.norm(rot_axis)
+
     # Hack to check if the trajectory should make a full revolution
+    # This is needed if a full rotation is made and the end is "in front" of the start
     # Assumes all positions are roughly planar and only one revolution is made
+    # This code checks if the orientation stays consistent throughout the trajectory via cross prod.
+    # If there is ever an orientation flip, then the trajectory has wrapped around.
+    # Since we don't assume an up vector, we can handle trajectories moving right or left.
     if mid_pos is not None:
         mid_t = mid_pos
-        a = np.cross(start_t, mid_t)
-        b = np.cross(mid_t, end_t)
-        is_aligned = np.dot(a, b) >= 0.
+        mid_t_hat = mid_t / np.linalg.norm(mid_t)
+        print(f"start_t_hat: {start_t_hat}")
+        print(f"mid_t: {mid_t}")
+        print(f"end_t_hat: {end_t_hat}")
+        a = np.cross(start_t_hat, mid_t_hat)
+        b = np.cross(mid_t_hat, end_t_hat)
+        c = rot_axis
+        print(f"start x mid: {a}")
+        print(f"mid x end: {b}")
+        print(f"start x end: {c}")
+        print(f"a.b: {np.dot(a, b)}")
+        print(f"b.c: {np.dot(b, c)}")
+        print(f"a.c: {np.dot(a, c)}")
+        is_aligned =  np.dot(a, b) >= 0. and \
+                      np.dot(b, c) >= 0. and \
+                      np.dot(a, c) >= 0.
         if not is_aligned:
             angle_rad += 2*np.pi
 
-    rot_axis = np.cross(start_t_hat, end_t_hat)
-    rot_axis /= np.linalg.norm(rot_axis)
     print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
 
     skew = np.array(
@@ -132,26 +150,45 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     )
 
     angles = np.linspace(0., angle_rad, num_steps+1)
-    radii = np.linspace(start_t_r, end_t_r, num_steps+1)
+    #radii = np.linspace(start_t_r, end_t_r, num_steps+1)
     rots =  np.eye(3) + \
             scale_matrix_by_coeffs(skew, np.sin(angles)) + \
             scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
 
     positions_hat = rots @ start_t_hat
     positions_hat /= np.linalg.norm(positions_hat, axis=-1, keepdims=True)
-    positions = np.multiply(positions_hat.T, radii).T
+    positions = positions_hat
+    #positions = np.multiply(positions_hat.T, radii).T
     return positions
 
 def spherical_trajectories(extrinsics):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
-    print(f"extrinsics shape: {extrinsics.shape}")
-    mid_idx = extrinsics.shape[0] // 2
-    start_t = extrinsics[0, :3, 3]
-    mid_t = extrinsics[mid_idx, :3, 3]
-    end_t = extrinsics[-1, :3, 3]
+    all_pos = extrinsics[:, :3, 3].reshape(-1, 3)
+    mean_pos = np.mean(all_pos, axis=0, keepdims=True)
+    all_pos -= mean_pos
+
+    print(f"all_pos shape: {all_pos.shape}")
+    mid_idx = all_pos.shape[0] // 2
+    start_t = all_pos[0, :]
+    mid_t = all_pos[mid_idx, :]
+    end_t = all_pos[-1, :]
     positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
+    #positions = get_spherical_trajectory(start_t, end_t)
+    positions += mean_pos
     print(f"positions shape: {positions.shape}")
+
+    '''
+    U, D, VT = np.linalg.svd(all_pos)
+    V = VT.T
+    plane_normal = np.cross(V[:, 0], V[:, 1])
+    plane_normal /= np.linalg.norm(plane_normal)
+    print(f"all_pos shape: {all_pos.shape}")
+    print(f"shapes: U: {U.shape}, D: {D.shape}, VT: {VT.shape}")
+    print(f"D: {D}")
+    print(f"V: {V}")
+    print(f"plane_normal: {plane_normal}")
+    '''
 
     mats = []
     for i in range(positions.shape[0]):
