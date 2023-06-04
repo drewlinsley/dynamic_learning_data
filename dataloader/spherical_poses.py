@@ -51,8 +51,7 @@ def cartesian_coords_from_spherical(azim_deg, elev_deg, radius):
     z = radius * np.cos(elev) * np.cos(azim)
     return trans_vec(x, y, z)
 
-def look_at_rotation(camera_position, at=np.array([0., 0., 0.])):
-    up = np.array([0., 1., 0.])
+def look_at_rotation(camera_position, at=np.array([0., 0., 0.]), up=np.array([0., 1., 0.])):
     z_axis = at - camera_position
     z_axis /= np.linalg.norm(z_axis)
     x_axis = np.cross(up, z_axis)
@@ -82,13 +81,156 @@ def camera_to_world_transform(azim, elev, radius, torch_output=False):
 
 
 def spherical_poses(image_to_camera_transform):
-    azims = np.linspace(180.-45., 180.+45., 40+1)
-    elevs = np.sin(np.linspace(0., 2*np.pi, 40+1))*30.
+    # Example trajectory definition
+    # Ideal for rendering teddybear scene 101_11758_21048
+    azims = np.linspace(15., 360.-15., 50+1)
+    elevs = np.ones_like(azims)*40.
     camera_trajectory = zip(azims, elevs)
-    dist = 15.
+    dist = 10.
     return np.stack(
         [
             camera_to_world_transform(az, el, dist) @ image_to_camera_transform
             for az, el in camera_trajectory
         ], 0
     )
+
+def scale_matrix_by_coeffs(matrix, coeffs):
+    tile_shape = [len(coeffs)] + [1]*len(matrix.shape)
+    matrices = np.tile(matrix, tile_shape)
+    res = np.multiply(matrices.T, coeffs).T
+    return res
+
+def project_point_to_plane(point, plane_normal, plane_point=np.array([0., 0., 0.])):
+    point -= plane_point
+    plane_normal_hat = plane_normal / np.linalg.norm(plane_normal)
+    point_parallel = np.dot(point, plane_normal_hat) * plane_normal_hat
+    point_proj = point - point_parallel
+    point_proj += plane_point
+    return point_proj
+
+def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
+    start_t, end_t = start_pos, end_pos
+    start_t_r = np.linalg.norm(start_t)
+    start_t_hat = start_t / start_t_r
+    end_t_r = np.linalg.norm(end_t)
+    end_t_hat = end_t / end_t_r
+
+    angle_rad = np.arccos(np.dot(start_t_hat, end_t_hat))
+
+    rot_axis = np.cross(start_t_hat, end_t_hat)
+    rot_axis /= np.linalg.norm(rot_axis)
+
+    # Hack to check if the trajectory should make a full revolution
+    # This is needed if a full rotation is made and the end is "in front" of the start
+    # Assumes all positions are roughly planar and only one revolution is made
+    # This code checks if the orientation stays consistent throughout the trajectory via cross prod.
+    # If there is ever an orientation flip, then the trajectory has wrapped around.
+    # Since we don't assume an up vector, we can handle trajectories moving right or left.
+    if mid_pos is not None:
+        mid_t = mid_pos
+        mid_t_hat = mid_t / np.linalg.norm(mid_t)
+        '''
+        print(f"start_t_hat: {start_t_hat}")
+        print(f"mid_t_hat: {mid_t_hat}")
+        print(f"end_t_hat: {end_t_hat}")
+        '''
+        a = np.cross(start_t_hat, mid_t_hat)
+        b = np.cross(mid_t_hat, end_t_hat)
+        c = rot_axis
+        '''
+        print(f"start x mid: {a}")
+        print(f"mid x end: {b}")
+        print(f"start x end: {c}")
+        print(f"a.b: {np.dot(a, b)}")
+        print(f"b.c: {np.dot(b, c)}")
+        print(f"a.c: {np.dot(a, c)}")
+        '''
+        is_aligned =  np.dot(a, b) >= 0. and \
+                      np.dot(b, c) >= 0. and \
+                      np.dot(a, c) >= 0.
+        if not is_aligned:
+            angle_rad += 2*np.pi
+
+    print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
+
+    skew = np.array(
+        [
+            [0.0, -rot_axis[2], rot_axis[1]],
+            [rot_axis[2], 0.0, -rot_axis[0]],
+            [-rot_axis[1], rot_axis[0], 0.0],
+        ]
+    )
+
+    angles = np.linspace(0., angle_rad, num_steps+1)
+    radii = np.linspace(start_t_r, end_t_r, num_steps+1)
+    rots =  np.eye(3) + \
+            scale_matrix_by_coeffs(skew, np.sin(angles)) + \
+            scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
+
+    positions_hat = rots @ start_t_hat
+    positions_hat /= np.linalg.norm(positions_hat, axis=-1, keepdims=True)
+    positions = positions_hat
+    positions = np.multiply(positions_hat.T, radii).T
+    return positions
+
+def get_linear_trajectory(start_pos, end_pos, num_steps=50):
+    start_t, end_t = start_pos, end_pos
+    diff = end_t - start_t
+    diff_mag = np.linalg.norm(diff)
+    diff_hat = diff / diff_mag
+
+    dists = np.linspace(0., diff_mag, num_steps+1)
+    positions = scale_matrix_by_coeffs(diff_hat, dists)
+    positions += start_t
+    return positions
+
+def spherical_trajectories(extrinsics):
+    # Extrinsics describes camera pose in world frame with OpenCV convention:
+    # z+ in, y+ down, x+ right
+    all_pos = np.copy(extrinsics[:, :3, 3].reshape(-1, 3))
+    mean_pos = np.mean(all_pos, axis=0, keepdims=True)
+    all_pos -= mean_pos
+    '''
+    print(f"mean_pos: {mean_pos}")
+    print(f"all_pos shape: {all_pos.shape}")
+    '''
+
+    mid_idx = all_pos.shape[0] // 2
+    start_t = all_pos[0, :]
+    mid_t = all_pos[mid_idx, :]
+    end_t = all_pos[-1, :]
+
+    U, D, VT = np.linalg.svd(all_pos)
+    V = VT.T
+    '''
+    print(f"all_pos shape: {all_pos.shape}")
+    print(f"shapes: U: {U.shape}, D: {D.shape}, VT: {VT.shape}")
+    print(f"D: {D}")
+    print(f"0/1: {D[0]/D[1]}, 1/2: {D[1]/D[2]}")
+    print(f"V: {V}")
+    '''
+    ratio_1 = D[0] / D[1]
+    ratio_2 = D[1] / D[2]
+    if 2.*ratio_1 < ratio_2:
+        plane_normal = V[:, 2]
+        print(f"plane_normal: {plane_normal}")
+        positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
+    else:
+        positions = get_linear_trajectory(start_t, end_t)
+    positions += mean_pos
+
+
+    mats = []
+    for i in range(positions.shape[0]):
+        t = positions[i, :]
+        #TODO: Figure out why up=[0, -1, 0] isn't correct
+        R = look_at_rotation(t)
+        E = np.eye(4)
+        E[:3, :3] = R
+        E[:3, 3] = t
+        mats.append(E[np.newaxis, ...])
+
+    mats = np.vstack(mats)
+    print(f"mats shape: {mats.shape}")
+    print(f"*************************************")
+    return mats
