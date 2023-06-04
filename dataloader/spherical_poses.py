@@ -121,18 +121,22 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     if mid_pos is not None:
         mid_t = mid_pos
         mid_t_hat = mid_t / np.linalg.norm(mid_t)
+        '''
         print(f"start_t_hat: {start_t_hat}")
-        print(f"mid_t: {mid_t}")
+        print(f"mid_t_hat: {mid_t_hat}")
         print(f"end_t_hat: {end_t_hat}")
+        '''
         a = np.cross(start_t_hat, mid_t_hat)
         b = np.cross(mid_t_hat, end_t_hat)
         c = rot_axis
+        '''
         print(f"start x mid: {a}")
         print(f"mid x end: {b}")
         print(f"start x end: {c}")
         print(f"a.b: {np.dot(a, b)}")
         print(f"b.c: {np.dot(b, c)}")
         print(f"a.c: {np.dot(a, c)}")
+        '''
         is_aligned =  np.dot(a, b) >= 0. and \
                       np.dot(b, c) >= 0. and \
                       np.dot(a, c) >= 0.
@@ -150,7 +154,7 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     )
 
     angles = np.linspace(0., angle_rad, num_steps+1)
-    #radii = np.linspace(start_t_r, end_t_r, num_steps+1)
+    radii = np.linspace(start_t_r, end_t_r, num_steps+1)
     rots =  np.eye(3) + \
             scale_matrix_by_coeffs(skew, np.sin(angles)) + \
             scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
@@ -158,37 +162,54 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     positions_hat = rots @ start_t_hat
     positions_hat /= np.linalg.norm(positions_hat, axis=-1, keepdims=True)
     positions = positions_hat
-    #positions = np.multiply(positions_hat.T, radii).T
+    positions = np.multiply(positions_hat.T, radii).T
+    return positions
+
+def get_linear_trajectory(start_pos, end_pos, num_steps=50):
+    start_t, end_t = start_pos, end_pos
+    diff = end_t - start_t
+    diff_mag = np.linalg.norm(diff)
+    diff_hat = diff / diff_mag
+
+    dists = np.linspace(0., diff_mag, num_steps+1)
+    positions = scale_matrix_by_coeffs(diff_hat, dists)
+    positions += start_t
     return positions
 
 def spherical_trajectories(extrinsics):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
-    all_pos = extrinsics[:, :3, 3].reshape(-1, 3)
+    all_pos = np.copy(extrinsics[:, :3, 3].reshape(-1, 3))
     mean_pos = np.mean(all_pos, axis=0, keepdims=True)
+    print(f"mean_pos: {mean_pos}")
     all_pos -= mean_pos
-
     print(f"all_pos shape: {all_pos.shape}")
+
     mid_idx = all_pos.shape[0] // 2
     start_t = all_pos[0, :]
     mid_t = all_pos[mid_idx, :]
     end_t = all_pos[-1, :]
-    positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
-    #positions = get_spherical_trajectory(start_t, end_t)
-    positions += mean_pos
-    print(f"positions shape: {positions.shape}")
 
-    '''
     U, D, VT = np.linalg.svd(all_pos)
     V = VT.T
-    plane_normal = np.cross(V[:, 0], V[:, 1])
-    plane_normal /= np.linalg.norm(plane_normal)
+    '''
     print(f"all_pos shape: {all_pos.shape}")
     print(f"shapes: U: {U.shape}, D: {D.shape}, VT: {VT.shape}")
     print(f"D: {D}")
+    print(f"0/1: {D[0]/D[1]}, 1/2: {D[1]/D[2]}")
     print(f"V: {V}")
-    print(f"plane_normal: {plane_normal}")
     '''
+    ratio_1 = D[0] / D[1]
+    ratio_2 = D[1] / D[2]
+    if 2.*ratio_1 < ratio_2:
+        plane_normal = np.cross(V[:, 0], V[:, 1])
+        plane_normal /= np.linalg.norm(plane_normal)
+        print(f"plane_normal: {plane_normal}")
+        positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
+    else:
+        positions = get_linear_trajectory(start_t, end_t)
+    positions += mean_pos
+
 
     mats = []
     for i in range(positions.shape[0]):
