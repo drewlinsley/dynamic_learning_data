@@ -100,6 +100,14 @@ def scale_matrix_by_coeffs(matrix, coeffs):
     res = np.multiply(matrices.T, coeffs).T
     return res
 
+def project_point_to_plane(point, plane_normal, plane_point=np.array([0., 0., 0.])):
+    point -= plane_point
+    plane_normal_hat = plane_normal / np.linalg.norm(plane_normal)
+    point_parallel = np.dot(point, plane_normal_hat) * plane_normal_hat
+    point_proj = point - point_parallel
+    point_proj += plane_point
+    return point_proj
+
 def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     start_t, end_t = start_pos, end_pos
     start_t_r = np.linalg.norm(start_t)
@@ -181,9 +189,11 @@ def spherical_trajectories(extrinsics):
     # z+ in, y+ down, x+ right
     all_pos = np.copy(extrinsics[:, :3, 3].reshape(-1, 3))
     mean_pos = np.mean(all_pos, axis=0, keepdims=True)
-    print(f"mean_pos: {mean_pos}")
     all_pos -= mean_pos
+    '''
+    print(f"mean_pos: {mean_pos}")
     print(f"all_pos shape: {all_pos.shape}")
+    '''
 
     mid_idx = all_pos.shape[0] // 2
     start_t = all_pos[0, :]
@@ -202,8 +212,7 @@ def spherical_trajectories(extrinsics):
     ratio_1 = D[0] / D[1]
     ratio_2 = D[1] / D[2]
     if 2.*ratio_1 < ratio_2:
-        plane_normal = np.cross(V[:, 0], V[:, 1])
-        plane_normal /= np.linalg.norm(plane_normal)
+        plane_normal = V[:, 2]
         print(f"plane_normal: {plane_normal}")
         positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
     else:
