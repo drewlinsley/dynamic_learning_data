@@ -184,6 +184,26 @@ def get_linear_trajectory(start_pos, end_pos, num_steps=50):
     positions += start_t
     return positions
 
+def estimate_winding(positions, up=np.array([0., -1., 0.])):
+    # Assumes positions are centered
+
+    unit_pos = positions / np.linalg.norm(positions, axis=1, keepdims=True)
+    # Drop last position since roll wraps around
+    cross_pos = unit_pos[:-1, :]
+    cross_pos_shift = np.roll(unit_pos, shift=-1, axis=0)[:-1, :]
+    cross_prods = np.cross(cross_pos, cross_pos_shift)
+
+    sines = np.linalg.norm(cross_prods, axis=1)
+    #print(f"cp shape: {cross_prods.shape}")
+    #print(f"up shape: {up.shape}")
+    orientations = np.sign(cross_prods @ up)
+    #print(f"orientations shape: {orientations.shape}")
+    sines *= orientations
+    theta = np.sum(np.arcsin(sines))
+    print(f"theta: {theta*180./np.pi}")
+
+    return theta
+
 def spherical_trajectories(extrinsics):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
@@ -202,18 +222,18 @@ def spherical_trajectories(extrinsics):
 
     U, D, VT = np.linalg.svd(all_pos)
     V = VT.T
-    '''
     print(f"all_pos shape: {all_pos.shape}")
     print(f"shapes: U: {U.shape}, D: {D.shape}, VT: {VT.shape}")
     print(f"D: {D}")
     print(f"0/1: {D[0]/D[1]}, 1/2: {D[1]/D[2]}")
     print(f"V: {V}")
-    '''
     ratio_1 = D[0] / D[1]
     ratio_2 = D[1] / D[2]
     if 2.*ratio_1 < ratio_2:
         plane_normal = V[:, 2]
         print(f"plane_normal: {plane_normal}")
+        # TODO: pass in plane normal and project points to plane
+        signed_theta = estimate_winding(all_pos)
         positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
     else:
         positions = get_linear_trajectory(start_t, end_t)
