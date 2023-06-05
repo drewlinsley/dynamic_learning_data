@@ -108,7 +108,7 @@ def project_point_to_plane(point, plane_normal, plane_point=np.array([0., 0., 0.
     point_proj += plane_point
     return point_proj
 
-def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
+def get_spherical_trajectory(start_pos, end_pos, winding=None, num_steps=50):
     start_t, end_t = start_pos, end_pos
     start_t_r = np.linalg.norm(start_t)
     start_t_hat = start_t / start_t_r
@@ -120,36 +120,19 @@ def get_spherical_trajectory(start_pos, end_pos, mid_pos=None, num_steps=50):
     rot_axis = np.cross(start_t_hat, end_t_hat)
     rot_axis /= np.linalg.norm(rot_axis)
 
-    # Hack to check if the trajectory should make a full revolution
-    # This is needed if a full rotation is made and the end is "in front" of the start
-    # Assumes all positions are roughly planar and only one revolution is made
-    # This code checks if the orientation stays consistent throughout the trajectory via cross prod.
-    # If there is ever an orientation flip, then the trajectory has wrapped around.
-    # Since we don't assume an up vector, we can handle trajectories moving right or left.
-    if mid_pos is not None:
-        mid_t = mid_pos
-        mid_t_hat = mid_t / np.linalg.norm(mid_t)
-        '''
-        print(f"start_t_hat: {start_t_hat}")
-        print(f"mid_t_hat: {mid_t_hat}")
-        print(f"end_t_hat: {end_t_hat}")
-        '''
-        a = np.cross(start_t_hat, mid_t_hat)
-        b = np.cross(mid_t_hat, end_t_hat)
-        c = rot_axis
-        '''
-        print(f"start x mid: {a}")
-        print(f"mid x end: {b}")
-        print(f"start x end: {c}")
-        print(f"a.b: {np.dot(a, b)}")
-        print(f"b.c: {np.dot(b, c)}")
-        print(f"a.c: {np.dot(a, c)}")
-        '''
-        is_aligned =  np.dot(a, b) >= 0. and \
-                      np.dot(b, c) >= 0. and \
-                      np.dot(a, c) >= 0.
-        if not is_aligned:
-            angle_rad += 2*np.pi
+    if winding is not None:
+        up = np.array([0., -1., 0.])
+        d = np.dot(up, rot_axis)
+        num_winds = np.abs(winding) // (2*np.pi)
+        winds_rad = num_winds * (2*np.pi)
+        # If we're going the correct direction, add on the extra rotations
+        if np.sign(d) == np.sign(winding):
+            angle_rad = winds_rad + angle_rad
+        # If we're going the wrong direction, we need to wrap the other way
+        # This also means the original rotation axis is backwards
+        else:
+            rot_axis *= -1
+            angle_rad = winds_rad + (2*np.pi - angle_rad)
 
     print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
 
@@ -184,16 +167,29 @@ def get_linear_trajectory(start_pos, end_pos, num_steps=50):
     positions += start_t
     return positions
 
+def estimate_winding(positions, up=np.array([0., -1., 0.])):
+    # Assumes positions are centered
+
+    unit_pos = positions / np.linalg.norm(positions, axis=1, keepdims=True)
+    # Drop last position since roll wraps around
+    cross_pos = unit_pos[:-1, :]
+    cross_pos_shift = np.roll(unit_pos, shift=-1, axis=0)[:-1, :]
+    cross_prods = np.cross(cross_pos, cross_pos_shift)
+
+    sines = np.linalg.norm(cross_prods, axis=1)
+    orientations = np.sign(cross_prods @ up)
+    sines *= orientations
+    theta = np.sum(np.arcsin(sines))
+    #print(f"theta: {theta*180./np.pi}")
+
+    return theta
+
 def spherical_trajectories(extrinsics):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
     all_pos = np.copy(extrinsics[:, :3, 3].reshape(-1, 3))
     mean_pos = np.mean(all_pos, axis=0, keepdims=True)
     all_pos -= mean_pos
-    '''
-    print(f"mean_pos: {mean_pos}")
-    print(f"all_pos shape: {all_pos.shape}")
-    '''
 
     mid_idx = all_pos.shape[0] // 2
     start_t = all_pos[0, :]
@@ -211,10 +207,14 @@ def spherical_trajectories(extrinsics):
     '''
     ratio_1 = D[0] / D[1]
     ratio_2 = D[1] / D[2]
+    # If third dim contributes significantly less info than second dim, assume planar
+    # Otherwise, assume linear or spherical and fit linear trajectory
     if 2.*ratio_1 < ratio_2:
         plane_normal = V[:, 2]
-        print(f"plane_normal: {plane_normal}")
-        positions = get_spherical_trajectory(start_t, end_t, mid_pos=mid_t)
+        #print(f"plane_normal: {plane_normal}")
+        # TODO: pass in plane normal and project points to plane
+        signed_theta = estimate_winding(all_pos)
+        positions = get_spherical_trajectory(start_t, end_t, winding=signed_theta)
     else:
         positions = get_linear_trajectory(start_t, end_t)
     positions += mean_pos
