@@ -209,6 +209,11 @@ if __name__ == "__main__":
         default=None,
         help="entity",
     )
+    parser.add_argument(
+        "--gpu_id",
+        type=int,
+        default=0,
+    )
     args = parser.parse_args()
 
     ginbs = []
@@ -223,4 +228,5 @@ if __name__ == "__main__":
         ckpt_path=args.ckpt_path,
         scene_name=args.scene_name,
         entity=args.entity,
+        gpu_id=args.gpu_id,
     )

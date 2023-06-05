@@ -44,4 +44,3 @@ run.run_train = False
 run.run_eval = False
 run.perturb_scale = 0.  # 1
 run.perturb_pose = 0.  # 2
-run.gpu_id = 0
