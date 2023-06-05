@@ -120,11 +120,19 @@ def get_spherical_trajectory(start_pos, end_pos, winding=None, num_steps=50):
     rot_axis = np.cross(start_t_hat, end_t_hat)
     rot_axis /= np.linalg.norm(rot_axis)
 
-    #TODO: investigate why we don't make use of winding sign
-    # Does original cross always give correct orientation?
     if winding is not None:
-        winds = np.abs(winding) // (2*np.pi)
-        angle_rad += winds * (2*np.pi)
+        up = np.array([0., -1., 0.])
+        d = np.dot(up, rot_axis)
+        num_winds = np.abs(winding) // (2*np.pi)
+        winds_rad = num_winds * (2*np.pi)
+        # If we're going the correct direction, add on the extra rotations
+        if np.sign(d) == np.sign(winding):
+            angle_rad = winds_rad + angle_rad
+        # If we're going the wrong direction, we need to wrap the other way
+        # This also means the original rotation axis is backwards
+        else:
+            rot_axis *= -1
+            angle_rad = winds_rad + (2*np.pi - angle_rad)
 
     print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
 
@@ -172,6 +180,7 @@ def estimate_winding(positions, up=np.array([0., -1., 0.])):
     orientations = np.sign(cross_prods @ up)
     sines *= orientations
     theta = np.sum(np.arcsin(sines))
+    #print(f"theta: {theta*180./np.pi}")
 
     return theta
 
