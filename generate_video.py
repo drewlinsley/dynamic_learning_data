@@ -19,14 +19,16 @@ def clear_scene_render_dir(scene):
     co3d_list = get_co3d_list()
     cls = co3d_list[scene]
     scene_render_dir = os.path.join(render_prefix, cls, scene)
-    return_code = subprocess.call(['rm', '-r', scene_render_dir])
-    return return_code
+    process = subprocess.run(['rm', '-r', scene_render_dir])
+    return process.returncode
 
-def generate_images(scene):
-    cmd_str = "python3 -m run --ginc configs/PeRFception-v1-1.gin --scene_name"
-    cmd = cmd_str.split() + [scene]
-    return_code = subprocess.call(cmd)
-    return return_code
+def generate_images(scene, gpu_id):
+    cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene}"
+    cmd = cmd_str.split()
+    print(f"Generating images for scene {scene}...")
+    process = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    print(f"Scene {scene} complete")
+    return process.returncode
 
 def generate_video(scene):
     render_path = "render"
@@ -54,20 +56,45 @@ def generate_video(scene):
     print(f"Completed processing {cls}, {scene}")
     return
 
+def generate_all_scenes(devices=[2,3,4,5,6,7]):
+    co3d_lists = get_co3d_list()
+    scenes = list(co3d_lists.keys())
+    scenes = scenes[:12]
+    num_devices = len(devices)
+    scenes_per_device = len(scenes) // num_devices
+    scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
+    for i in range(len(scenes) % num_devices):
+        idx = num_devices * scenes_per_device + i
+        scene_dist[i].append(scenes[idx])
+
+    processes = []
+    for i in range(num_devices):
+        cmd = ["python", "generate_video.py", "--gpu_id", str(devices[i])] + scene_dist[i]
+        process = subprocess.Popen(cmd)
+        processes.append(process)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenes", nargs="+")
+    parser.add_argument("scenes", nargs="*")
     parser.add_argument("--generate", action="store_true", default=True)
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
+    parser.add_argument("-g", "--gpu_id", type=int)
+    parser.add_argument("--all", action="store_true", default=False)
 
     args = parser.parse_args()
+
+    if args.all:
+        generate_all_scenes()
 
     for scene in args.scenes:
         return_code = 0
         if args.generate:
             return_code = clear_scene_render_dir(scene)
-            return_code = generate_images(scene)
+            try:
+                return_code = generate_images(scene, args.gpu_id)
+            except:
+                return_code = -1
 
         if return_code == 0:
             generate_video(scene)
