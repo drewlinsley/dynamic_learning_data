@@ -738,15 +738,14 @@ class LitPlenoxel(LitModel):
                 with open("dataloader/co3d_lists/co3d_list.json") as fp:
                     co3d_list = json.load(fp)
                 class_name = co3d_list[scene_number]
-                class_path = f"render/{class_name}"
-                scene_path = f"render/{class_name}/{scene_number}"  # EDIT
+                class_path = f"{self.render_path}/{class_name}"
+                scene_path = f"{self.render_path}/{class_name}/{scene_number}"  # EDIT
                 # scene_path = f"render/plenoxel_co3d_{scene_number}"
             else:
                 scene_name = self.trainer.datamodule.scene_name
-                scene_path = f"render/{scene_name}"
+                scene_path = f"{self.render_path}/{scene_name}"
             opt_list = ["bg"] if self.bkgd_only else ["fg", "fgbg"]
 
-            scene_path = os.path.join(self.render_path, scene_path)
             os.makedirs(scene_path, exist_ok=True)
             for opt in opt_list:
                 opt_path = os.path.join(scene_path, opt)
