@@ -56,6 +56,7 @@ def run(
     run_eval: bool = True,
     run_render: bool = False,
     accelerator: str = "gpu",
+    gpu_id: Optional[int] = 0,
     num_gpus: Optional[int] = 1,
     num_tpus: Optional[int] = None,
     num_sanity_val_steps: int = 0,
@@ -122,7 +123,7 @@ def run(
     trainer = Trainer(
         logger=wandb_logger if run_train or run_render else None,
         log_every_n_steps=log_every_n_steps,
-        devices=num_gpus,
+        devices = [gpu_id],
         max_steps=max_steps,
         replace_sampler_ddp=False,
         check_val_every_n_epoch=check_val_every_n_epoch,
@@ -131,7 +132,6 @@ def run(
         num_sanity_val_steps=num_sanity_val_steps,
         callbacks=callbacks,
         strategy='ddp',
-        gpus=num_gpus,
     )
 
     if resume_training:
