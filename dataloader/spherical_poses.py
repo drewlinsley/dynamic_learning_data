@@ -94,6 +94,7 @@ def spherical_poses(image_to_camera_transform):
         ], 0
     )
 
+# TODO: investigate broadcasting approach
 def scale_matrix_by_coeffs(matrix, coeffs):
     tile_shape = [len(coeffs)] + [1]*len(matrix.shape)
     matrices = np.tile(matrix, tile_shape)
@@ -108,33 +109,46 @@ def project_point_to_plane(point, plane_normal, plane_point=np.array([0., 0., 0.
     point_proj += plane_point
     return point_proj
 
-def get_spherical_trajectory(start_pos, end_pos, winding=None, num_steps=50):
+def get_spherical_trajectory(start_pos, end_pos, winding=None, plane_normal=None, up=np.array([0., -1., 0.]), num_steps=50):
     start_t, end_t = start_pos, end_pos
+    if plane_normal is not None:
+        start_t = project_point_to_plane(start_t, plane_normal)
+        end_t = project_point_to_plane(end_t, plane_normal)
     start_t_r = np.linalg.norm(start_t)
     start_t_hat = start_t / start_t_r
     end_t_r = np.linalg.norm(end_t)
     end_t_hat = end_t / end_t_r
 
     angle_rad = np.arccos(np.dot(start_t_hat, end_t_hat))
+    start_end_cross = np.cross(start_t_hat, end_t_hat)
 
-    rot_axis = np.cross(start_t_hat, end_t_hat)
+    rot_axis = plane_normal if plane_normal is not None else start_end_cross
     rot_axis /= np.linalg.norm(rot_axis)
 
+    # If we have a winding, then we're trying to match some given trajectory data
     if winding is not None:
-        up = np.array([0., -1., 0.])
-        d = np.dot(up, rot_axis)
         num_winds = np.abs(winding) // (2*np.pi)
         winds_rad = num_winds * (2*np.pi)
-        # If we're going the correct direction, add on the extra rotations
-        if np.sign(d) == np.sign(winding):
+        # There are four cases to distinguish:
+        # End vec is "in front" or "behind" start vec (sign of cross dot up)
+        # Trajectory should wind right or left (sign of winding)
+        d = np.dot(start_end_cross, up)
+        # If end is in front of start and we go right -> full rev
+        # e.g. scene 101_11758_21048
+        if d >= 0. and winding >= 0.:
             angle_rad = winds_rad + angle_rad
-        # If we're going the wrong direction, we need to wrap the other way
-        # This also means the original rotation axis is backwards
-        else:
-            rot_axis *= -1
+        # end is in front and we go left -> partial rev
+        # e.g. truncate scene 253_27225_54554
+        elif d >= 0. and winding < 0.:
             angle_rad = winds_rad + (2*np.pi - angle_rad)
-
-    print(f"angle: {angle_rad*180./np.pi}, rot_axis: {rot_axis}")
+        # end is behind and we go right -> partial rev
+        # e.g. scene 108_12889_25676
+        elif d < 0. and winding >= 0.:
+            angle_rad = winds_rad + (2*np.pi - angle_rad)
+        # end is behind and we go left -> full rev
+        # e.g. scene 253_27225_54554
+        else: # d < 0. and winding < 0:
+            angle_rad = winds_rad + angle_rad
 
     skew = np.array(
         [
@@ -180,7 +194,6 @@ def estimate_winding(positions, up=np.array([0., -1., 0.])):
     orientations = np.sign(cross_prods @ up)
     sines *= orientations
     theta = np.sum(np.arcsin(sines))
-    #print(f"theta: {theta*180./np.pi}")
 
     return theta
 
@@ -198,23 +211,18 @@ def spherical_trajectories(extrinsics):
 
     U, D, VT = np.linalg.svd(all_pos)
     V = VT.T
-    '''
-    print(f"all_pos shape: {all_pos.shape}")
-    print(f"shapes: U: {U.shape}, D: {D.shape}, VT: {VT.shape}")
-    print(f"D: {D}")
-    print(f"0/1: {D[0]/D[1]}, 1/2: {D[1]/D[2]}")
-    print(f"V: {V}")
-    '''
     ratio_1 = D[0] / D[1]
     ratio_2 = D[1] / D[2]
     # If third dim contributes significantly less info than second dim, assume planar
     # Otherwise, assume linear or spherical and fit linear trajectory
     if 2.*ratio_1 < ratio_2:
         plane_normal = V[:, 2]
-        #print(f"plane_normal: {plane_normal}")
-        # TODO: pass in plane normal and project points to plane
+        up = np.array([0., -1., 0.])
+        d = np.dot(plane_normal, up)
         signed_theta = estimate_winding(all_pos)
-        positions = get_spherical_trajectory(start_t, end_t, winding=signed_theta)
+        # Align plane normal with estimated winding direction
+        plane_normal = plane_normal if np.sign(d) == np.sign(signed_theta) else -1*plane_normal
+        positions = get_spherical_trajectory(start_t, end_t, winding=signed_theta, plane_normal=plane_normal)
     else:
         positions = get_linear_trajectory(start_t, end_t)
     positions += mean_pos
