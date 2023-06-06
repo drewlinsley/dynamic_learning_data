@@ -54,10 +54,10 @@ def generate_video(scene, render_path="render"):
     print(f"Completed processing {cls}, {scene}")
     return
 
-def generate_all_scenes(devices=[2,3,4,5,6,7]):
+def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = list(co3d_lists.keys())
-    scenes = scenes[:12]
+    scenes = scenes
     num_devices = len(devices)
     scenes_per_device = len(scenes) // num_devices
     scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
