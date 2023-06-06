@@ -15,7 +15,7 @@ from pytorch_lightning.callbacks import (
     ModelCheckpoint,
     TQDMProgressBar,
 )
-from pytorch_lightning.plugins import DDPPlugin
+from pytorch_lightning.plugins import SingleDevicePlugin
 
 from utils.logger import RetryingWandbLogger
 from utils.select_option import select_callback, select_dataset, select_model
@@ -132,7 +132,7 @@ def run(
         accelerator="gpu",
         num_sanity_val_steps=num_sanity_val_steps,
         callbacks=callbacks,
-        strategy='ddp',
+        strategy=SingleDevicePlugin(device=torch.device(f"cuda:{gpu_id}")),
     )
 
     if resume_training:
