@@ -90,7 +90,7 @@ if __name__ == "__main__":
     parser.add_argument("scenes", nargs="*")
     parser.add_argument("--generate", action="store_true", default=True)
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
-    parser.add_argument("-g", "--gpu_id", type=int)
+    parser.add_argument("-g", "--gpu_id", type=int, default=0)
     parser.add_argument("--all", action="store_true", default=False)
     parser.add_argument("--render_path", type=str, default="render")
 

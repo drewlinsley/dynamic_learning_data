@@ -11,7 +11,8 @@ class DDPSampler(SequentialSampler):
         self.data_source=None
         self.batch_size = batch_size
         self.drop_last=False
-        ngpus = torch.cuda.device_count()
+        #ngpus = torch.cuda.device_count()
+        ngpus = 1
         if ngpus == 1 and not tpu:
             rank, num_replicas = 0, 1
         else:
