@@ -1,15 +1,26 @@
 import argparse
 import os
 import json
+import signal
 import subprocess
 import sys
+import time
 import imageio
 from PIL import Image
 import numpy as np
 
 
+processes = []
+
+def signal_handler(sig, frame):
+    for p in processes:
+        p.kill()
+        p.wait()
+
+signal.signal(signal.SIGINT, signal_handler)
+
 def get_co3d_list():
-    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list.json"
+    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list_good.json"
     with open(co3d_list_rel_path) as fp:
         co3d_list = json.load(fp)
     return co3d_list
@@ -57,7 +68,6 @@ def generate_video(scene, render_path="render"):
 def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = list(co3d_lists.keys())
-    scenes = scenes
     num_devices = len(devices)
     scenes_per_device = len(scenes) // num_devices
     scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
@@ -65,11 +75,14 @@ def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
         idx = num_devices * scenes_per_device + i
         scene_dist[i].append(scenes[idx])
 
-    processes = []
     for i in range(num_devices):
         cmd = ["python", "generate_video.py", "--gpu_id", str(devices[i])] + scene_dist[i]
         process = subprocess.Popen(cmd)
         processes.append(process)
+
+    for p in processes:
+        while p.poll() == None:
+            time.sleep(0.5)
 
 
 if __name__ == "__main__":
@@ -85,6 +98,7 @@ if __name__ == "__main__":
 
     if args.all:
         generate_all_scenes()
+        exit()
 
     for scene in args.scenes:
         return_code = 0
