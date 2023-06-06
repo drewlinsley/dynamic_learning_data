@@ -14,22 +14,22 @@ def get_co3d_list():
         co3d_list = json.load(fp)
     return co3d_list
 
-def clear_scene_render_dir(scene):
-    render_prefix = "render"
+def clear_scene_render_dir(scene, render_path="render"):
     co3d_list = get_co3d_list()
     cls = co3d_list[scene]
-    scene_render_dir = os.path.join(render_prefix, cls, scene)
-    return_code = subprocess.call(['rm', '-r', scene_render_dir])
-    return return_code
+    scene_render_dir = os.path.join(render_path, cls, scene)
+    process = subprocess.run(['rm', '-r', scene_render_dir])
+    return process.returncode
 
-def generate_images(scene):
-    cmd_str = "python3 -m run --ginc configs/PeRFception-v1-1.gin --scene_name"
-    cmd = cmd_str.split() + [scene]
-    return_code = subprocess.call(cmd)
-    return return_code
+def generate_images(scene, gpu_id, render_path):
+    cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path}"
+    cmd = cmd_str.split()
+    print(f"Generating images for scene {scene}...")
+    process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
+    print(f"Scene {scene} complete")
+    return process.returncode
 
-def generate_video(scene):
-    render_path = "render"
+def generate_video(scene, render_path="render"):
     asset = "fgbg"
 
     co3d_lists = get_co3d_list()
@@ -54,20 +54,46 @@ def generate_video(scene):
     print(f"Completed processing {cls}, {scene}")
     return
 
+def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
+    co3d_lists = get_co3d_list()
+    scenes = list(co3d_lists.keys())
+    scenes = scenes
+    num_devices = len(devices)
+    scenes_per_device = len(scenes) // num_devices
+    scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
+    for i in range(len(scenes) % num_devices):
+        idx = num_devices * scenes_per_device + i
+        scene_dist[i].append(scenes[idx])
+
+    processes = []
+    for i in range(num_devices):
+        cmd = ["python", "generate_video.py", "--gpu_id", str(devices[i])] + scene_dist[i]
+        process = subprocess.Popen(cmd)
+        processes.append(process)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenes", nargs="+")
+    parser.add_argument("scenes", nargs="*")
     parser.add_argument("--generate", action="store_true", default=True)
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
+    parser.add_argument("-g", "--gpu_id", type=int)
+    parser.add_argument("--all", action="store_true", default=False)
+    parser.add_argument("--render_path", type=str, default="render")
 
     args = parser.parse_args()
+
+    if args.all:
+        generate_all_scenes()
 
     for scene in args.scenes:
         return_code = 0
         if args.generate:
-            return_code = clear_scene_render_dir(scene)
-            return_code = generate_images(scene)
+            return_code = clear_scene_render_dir(scene, render_path=args.render_path)
+            try:
+                return_code = generate_images(scene, args.gpu_id, args.render_path)
+            except:
+                return_code = -1
 
         if return_code == 0:
-            generate_video(scene)
+            generate_video(scene, render_path=args.render_path)

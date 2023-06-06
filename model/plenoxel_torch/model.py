@@ -183,6 +183,7 @@ class LitPlenoxel(LitModel):
         density_clip_max: float = 100,
         # Render Option
         bkgd_only: bool = False,
+        render_path: str = "render",
         # Scannet specific option
         init_grid_with_pcd: bool = True,
         upsample_stride: int = 1,
@@ -730,19 +731,19 @@ class LitPlenoxel(LitModel):
             rets[key] = ret
 
         if self.trainer.is_global_zero:
-            os.makedirs("render", exist_ok=True)
+            os.makedirs(self.render_path, exist_ok=True)
             path_to_store = self.trainer.model.logdir
             scene_number = "_".join(path_to_store.split("_")[-3:])
             if self.trainer.datamodule.__class__.__name__ == "LitDataCo3D":
                 with open("dataloader/co3d_lists/co3d_list.json") as fp:
                     co3d_list = json.load(fp)
                 class_name = co3d_list[scene_number]
-                class_path = f"render/{class_name}"
-                scene_path = f"render/{class_name}/{scene_number}"  # EDIT
+                class_path = f"{self.render_path}/{class_name}"
+                scene_path = f"{self.render_path}/{class_name}/{scene_number}"  # EDIT
                 # scene_path = f"render/plenoxel_co3d_{scene_number}"
             else:
                 scene_name = self.trainer.datamodule.scene_name
-                scene_path = f"render/{scene_name}"
+                scene_path = f"{self.render_path}/{scene_name}"
             opt_list = ["bg"] if self.bkgd_only else ["fg", "fgbg"]
 
             os.makedirs(scene_path, exist_ok=True)
