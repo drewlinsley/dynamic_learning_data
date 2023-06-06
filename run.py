@@ -36,6 +36,7 @@ def str2bool(v):
 def run(
     resume_training: bool = False,
     ckpt_path: Optional[str] = None,
+    render_path: Optional[str] = "render",
     datadir: Optional[str] = None,
     logbase: Optional[str] = None,
     scene_name: Optional[str] = None,
@@ -148,7 +149,7 @@ def run(
         perturb_scale=perturb_scale,
         perturb_pose=perturb_pose
     )
-    model = select_model(model_name=model_name)
+    model = select_model(model_name=model_name, render_path=render_path)
     model.logdir = logdir
     if run_train:
         trainer.fit(model, data_module, ckpt_path=ckpt_path)
@@ -214,6 +215,11 @@ if __name__ == "__main__":
         type=int,
         default=0,
     )
+    parser.add_argument(
+        "--render_path",
+        type=str,
+        default="render",
+    )
     args = parser.parse_args()
 
     ginbs = []
@@ -226,6 +232,7 @@ if __name__ == "__main__":
     run(
         resume_training=args.resume_training,
         ckpt_path=args.ckpt_path,
+        render_path=args.render_path,
         scene_name=args.scene_name,
         entity=args.entity,
         gpu_id=args.gpu_id,
