@@ -20,7 +20,7 @@ dataloader/co3d_lists/*
 *.ipynb_checkpoints*
 
 playground/*
-render/*
+render*/*
 tsdf_results/
 
 PeRFception-v1-*
@@ -28,3 +28,5 @@ PeRFception-models
 
 *.swp
 *.swo
+
+*.stats
