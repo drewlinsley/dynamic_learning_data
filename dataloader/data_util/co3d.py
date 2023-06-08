@@ -86,14 +86,16 @@ def similarity_from_cameras(c2w, fix_rot=False):
     return transform, scale
 
 def process_frame(frame, context):
-    datadir, max_image_dim, v2_mode, perturb_pose, cam_trans = context
-    img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
-    # # open jpeg file
-    # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
-    # # start to decode the JPEG file
-    # img = turbo_jpeg.decode(in_file.read())
+    datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs = context
+    img = None
+    if not read_imgs:
+        img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
+        # # open jpeg file
+        # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
+        # # start to decode the JPEG file
+        # img = turbo_jpeg.decode(in_file.read())
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
 
     H, W = frame["image"]["size"]
     max_hw = max(H, W)
@@ -102,7 +104,8 @@ def process_frame(frame, context):
     if approx_scale < 1.0:
         H2 = int(approx_scale * H)
         W2 = int(approx_scale * W)
-        img = cv2.resize(img, (W2, H2), interpolation=cv2.INTER_AREA)
+        if not read_imgs:
+            img = cv2.resize(img, (W2, H2), interpolation=cv2.INTER_AREA)
     else:
         H2 = H
         W2 = W
@@ -190,7 +193,9 @@ def load_co3d_data(
         pose_perturb = np.random.rand(3) * perturb_pose - (perturb_pose / 2)
     t_d1 = time.time()
 
-    context = [datadir, max_image_dim, v2_mode, perturb_pose, cam_trans]
+    # TODO: this probably breaks training, fix if we ever plan to do so
+    read_imgs = False
+    context = [datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs]
     contexts = [context]*len(frame_data)
 
     with multiprocessing.Pool(processes=4) as pool:
