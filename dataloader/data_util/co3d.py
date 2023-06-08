@@ -1,3 +1,4 @@
+import time
 import glob
 import gzip
 import json
@@ -91,15 +92,16 @@ def load_co3d_data(
     max_image_dim: int,
     cam_scale_factor: float,
     # render_strategy: "spherical",
-    render_scene_interp: bool = True,
+    render_scene_interp: bool = False,
     render_scene_spherical: bool = False,
-    render_scene_trajectory: bool = False,
+    render_scene_trajectory: bool = True,
     render_random_pose: bool = False,
     interp_fac: int = 0,
     perturb_pose: float = 0.,
     v2_mode: bool = False
 ):
 
+    t_a1 = time.time()
     # cam_scale_factor = 2
     with open("dataloader/co3d_lists/co3d_list.json") as fp:
         co3d_lists = json.load(fp)
@@ -111,22 +113,29 @@ def load_co3d_data(
 
     scene_number = basedir.split("/")[-1]
 
-    json_path = os.path.join(basedir, "..", "frame_annotations.jgz")
-    with gzip.open(json_path, "r") as fp:
-        all_frames_data = json.load(fp)
-
     frame_data, images, intrinsics, extrinsics, image_sizes = [], [], [], [], []
 
-    for temporal_data in all_frames_data:
-        if temporal_data["sequence_name"] == scene_number:
-            frame_data.append(temporal_data)
+    t_b1 = time.time()
+    #json_path = os.path.join(basedir, "..", "frame_annotations.jgz")
+    # Reading from preprocessed annotations gives significant speedup
+    # Generate `co3d_annotations` by running `preprocess_co3d_annotations.py`
+    # then move `co3d_annotations` to be a sibling of `co3d` data.
+    json_path = os.path.join(f"{datadir}/../co3d_annotations", cls_name, scene_name, "frame_annotations.jgz")
+    with gzip.open(json_path, "r") as fp:
+        frame_data = json.load(fp)
+    t_b2 = time.time()
 
     used = []
     # turbo_jpeg = TurboJPEG()
     if perturb_pose:
         pose_perturb = np.random.rand(3) * perturb_pose - (perturb_pose / 2)
+    t_d1 = time.time()
+    t_gtot = 0
     for (i, frame) in enumerate(frame_data):
+        t_g1 = time.time()
         img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
+        t_g2 = time.time()
+        t_gtot += t_g2-t_g1
         # # open jpeg file
         # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
         # # start to decode the JPEG file
@@ -189,6 +198,7 @@ def load_co3d_data(
         intrinsics.append(intrinsic)
         extrinsics.append(pose)
         images.append(img)
+    t_d2 = time.time()
 
     intrinsics = np.stack(intrinsics)
     extrinsics = np.stack(extrinsics)
@@ -215,7 +225,9 @@ def load_co3d_data(
         images = [images[i] for i in range(len(inlier)) if inlier[i]]
 
     extrinsics = np.stack(extrinsics)
+    t_e1 = time.time()
     T, sscale = similarity_from_cameras(extrinsics)
+    t_e2 = time.time()
     extrinsics = T @ extrinsics
     
     extrinsics[:, :3, 3] *= sscale * cam_scale_factor
@@ -228,6 +240,7 @@ def load_co3d_data(
     i_train = np.array([i for i in i_all if not i in i_test])
     i_split = (i_train, i_val, i_test, i_all)
 
+    t_f1 = time.time()
     if render_random_pose:
         render_poses = random_pose(extrinsics[i_all], 50)
     elif render_scene_interp:
@@ -238,6 +251,7 @@ def load_co3d_data(
         render_poses = spherical_trajectories(extrinsics[i_all])
     else:
         raise NotImplementedError("Need a rendering strategy.")
+    t_f2 = time.time()
     
     near, far = 0., 1.
     ndc_coeffs = (-1., -1.)
@@ -249,6 +263,16 @@ def load_co3d_data(
     label_info["extrinsics"] = extrinsics
     label_info["intrinsics"] = intrinsics
     label_info["image_sizes"] = image_sizes
+
+    t_a2 = time.time()
+    '''
+    print(f"time total: {t_a2-t_a1:.3f}")
+    print(f"time json: {t_b2-t_b1:.3f}")
+    print(f"time img: {t_d2-t_d1:.3f}")
+    print(f"time imread: {t_gtot:.3f}")
+    print(f"time simil: {t_e2-t_e1:.3f}")
+    print(f"time traj: {t_f2-t_f1:.3f}")
+    '''
 
     return (
         images, 
