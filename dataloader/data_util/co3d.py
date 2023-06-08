@@ -2,6 +2,7 @@ import time
 import glob
 import gzip
 import json
+import multiprocessing
 import os
 
 import cv2
@@ -84,6 +85,64 @@ def similarity_from_cameras(c2w, fix_rot=False):
     scale = 1.0 / np.median(np.linalg.norm(t + translate, axis=-1))
     return transform, scale
 
+def process_frame(frame, context):
+    datadir, max_image_dim, v2_mode, perturb_pose, cam_trans = context
+    img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
+    # # open jpeg file
+    # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
+    # # start to decode the JPEG file
+    # img = turbo_jpeg.decode(in_file.read())
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
+
+    H, W = frame["image"]["size"]
+    max_hw = max(H, W)
+    approx_scale = max_image_dim / max_hw
+
+    if approx_scale < 1.0:
+        H2 = int(approx_scale * H)
+        W2 = int(approx_scale * W)
+        img = cv2.resize(img, (W2, H2), interpolation=cv2.INTER_AREA)
+    else:
+        H2 = H
+        W2 = W
+
+    image_size = np.array([H2, W2])
+    fxy = np.array(frame["viewpoint"]["focal_length"])
+    # fxy = 0.17  # 17 mm focal length of eye
+    cxy = np.array(frame["viewpoint"]["principal_point"])
+    R = np.array(frame["viewpoint"]["R"])
+    T = np.array(frame["viewpoint"]["T"])
+
+    if v2_mode:
+        min_HW = min(W2, H2)
+        image_size_half = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32)
+        scale_arr = np.array([min_HW * 0.5, min_HW * 0.5], dtype=np.float32)
+        fxy_x = fxy * scale_arr
+        prp_x = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32) - cxy * scale_arr
+        cxy = (image_size_half - prp_x) / image_size_half
+        fxy = fxy_x / image_size_half
+
+    scale_arr = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32)
+    focal = fxy * scale_arr
+    prp = -1.0 * (cxy - 1.0) * scale_arr
+
+    pose = np.eye(4)
+    pose[:3, :3] = R
+    pose[:3, 3:] = -R @ T[..., None]
+    if perturb_pose:
+        pose[:-1, :-1] += pose_perturb  # EDIT
+    pose = pose @ cam_trans
+    intrinsic = np.array(
+        [
+            [focal[0], 0.0, prp[0], 0.0],
+            [0.0, focal[1], prp[1], 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    return (image_size, intrinsic, pose, img)
 
 @gin.configurable()
 def load_co3d_data(
@@ -130,65 +189,18 @@ def load_co3d_data(
     if perturb_pose:
         pose_perturb = np.random.rand(3) * perturb_pose - (perturb_pose / 2)
     t_d1 = time.time()
-    t_gtot = 0
-    for (i, frame) in enumerate(frame_data):
-        t_g1 = time.time()
-        img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
-        t_g2 = time.time()
-        t_gtot += t_g2-t_g1
-        # # open jpeg file
-        # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
-        # # start to decode the JPEG file
-        # img = turbo_jpeg.decode(in_file.read())
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
+    context = [datadir, max_image_dim, v2_mode, perturb_pose, cam_trans]
+    contexts = [context]*len(frame_data)
 
-        H, W = frame["image"]["size"]
-        max_hw = max(H, W)
-        approx_scale = max_image_dim / max_hw
+    with multiprocessing.Pool(processes=4) as pool:
+        results = pool.starmap(process_frame, zip(frame_data, contexts))
 
-        if approx_scale < 1.0:
-            H2 = int(approx_scale * H)
-            W2 = int(approx_scale * W)
-            img = cv2.resize(img, (W2, H2), interpolation=cv2.INTER_AREA)
-        else:
-            H2 = H
-            W2 = W
+    for i, result in enumerate(results):
+        if result is None:
+            continue
 
-        image_size = np.array([H2, W2])
-        fxy = np.array(frame["viewpoint"]["focal_length"])
-        # fxy = 0.17  # 17 mm focal length of eye
-        cxy = np.array(frame["viewpoint"]["principal_point"])
-        R = np.array(frame["viewpoint"]["R"])
-        T = np.array(frame["viewpoint"]["T"])
-
-        if v2_mode:
-            min_HW = min(W2, H2)
-            image_size_half = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32) 
-            scale_arr = np.array([min_HW * 0.5, min_HW * 0.5], dtype=np.float32)
-            fxy_x = fxy * scale_arr
-            prp_x = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32) - cxy * scale_arr
-            cxy = (image_size_half - prp_x) / image_size_half 
-            fxy = fxy_x / image_size_half
-
-        scale_arr = np.array([W2 * 0.5, H2 * 0.5], dtype=np.float32) 
-        focal = fxy * scale_arr
-        prp = -1.0 * (cxy - 1.0) * scale_arr
-
-        pose = np.eye(4)
-        pose[:3, :3] = R
-        pose[:3, 3:] = -R @ T[..., None]
-        if perturb_pose:
-            pose[:-1, :-1] += pose_perturb  # EDIT
-        pose = pose @ cam_trans
-        intrinsic = np.array(
-            [
-                [focal[0], 0.0, prp[0], 0.0],
-                [0.0, focal[1], prp[1], 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ]
-        )
+        image_size, intrinsic, pose, img = result
 
         if any([np.all(pose == _pose) for _pose in extrinsics]):
             continue
@@ -198,6 +210,8 @@ def load_co3d_data(
         intrinsics.append(intrinsic)
         extrinsics.append(pose)
         images.append(img)
+
+
     t_d2 = time.time()
 
     intrinsics = np.stack(intrinsics)
@@ -269,7 +283,6 @@ def load_co3d_data(
     print(f"time total: {t_a2-t_a1:.3f}")
     print(f"time json: {t_b2-t_b1:.3f}")
     print(f"time img: {t_d2-t_d1:.3f}")
-    print(f"time imread: {t_gtot:.3f}")
     print(f"time simil: {t_e2-t_e1:.3f}")
     print(f"time traj: {t_f2-t_f1:.3f}")
     '''
