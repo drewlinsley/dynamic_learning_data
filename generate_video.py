@@ -37,7 +37,8 @@ def generate_images(scene, gpu_id, render_path, render_strategy, do_render):
     cmd = cmd_str.split()
     cmd += ['--no-render'] if not do_render else []
     print(f"Generating images for scene {scene}...")
-    process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
+    #process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
+    process = subprocess.run(cmd)
     print(f"Scene {scene} complete")
     return process.returncode
 
@@ -115,5 +116,5 @@ if __name__ == "__main__":
             except:
                 return_code = -1
 
-        if return_code == 0:
+        if return_code == 0 and args.render:
             generate_video(scene, render_path=args.render_path)
