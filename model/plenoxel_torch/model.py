@@ -765,7 +765,8 @@ class LitPlenoxel(LitModel):
         if self.save_metadata:
             np.savez_compressed(f"{scene_path}/{class_name}_{scene_number}.npz",
                                 extrinsics=self.trainer.datamodule.render_poses,
-                                intrinsics=self.trainer.datamodule.intrinsics)
+                                intrinsics=self.trainer.datamodule.intrinsics,
+                                **self.trainer.datamodule.extra_data)
 
     def validation_epoch_end(self, outputs):
         val_image_sizes = self.trainer.datamodule.val_image_sizes

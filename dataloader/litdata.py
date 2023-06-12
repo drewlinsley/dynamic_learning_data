@@ -40,6 +40,7 @@ class LitDataCo3D(LitData):
             (self.i_train, self.i_val, self.i_test, self.i_all),
             self.render_poses,
             self.label_info,
+            self.extra_data,
         ) = load_co3d_data(
             datadir=datadir,
             scene_name=scene_name,

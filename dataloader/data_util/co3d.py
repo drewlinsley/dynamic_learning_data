@@ -166,6 +166,8 @@ def load_co3d_data(
     v2_mode: bool = False
 ):
 
+    extra_data = {}
+
     t_a1 = time.time()
     # cam_scale_factor = 2
     with open("dataloader/co3d_lists/co3d_list.json") as fp:
@@ -264,7 +266,8 @@ def load_co3d_data(
 
     t_f1 = time.time()
     if render_strategy == "canonical":
-        render_poses = spherical_trajectories(extrinsics[i_all])
+        render_poses, misc = spherical_trajectories(extrinsics[i_all])
+        extra_data.update(misc)
     elif render_strategy == "interpolation":
         render_poses = pose_interp(extrinsics[i_all], interp_fac)
     elif render_strategy == "spherical":
@@ -305,5 +308,6 @@ def load_co3d_data(
         ndc_coeffs, 
         i_split,
         render_poses,
-        label_info
+        label_info,
+        extra_data,
     )
