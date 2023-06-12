@@ -26,6 +26,7 @@ def select_dataset(
     perturb_scale: float,
     perturb_pose: float,
     render_strategy: str,
+    do_render: bool,
 ):
     if dataset_name == "co3d":
         data_fun = LitDataCo3D
@@ -44,6 +45,7 @@ def select_dataset(
         perturb_scale=perturb_scale,
         perturb_pose=perturb_pose,
         render_strategy=render_strategy,
+        do_render=do_render,
     )
 
 def select_callback(model_name):

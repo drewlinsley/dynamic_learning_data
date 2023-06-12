@@ -151,6 +151,7 @@ def run(
         perturb_scale=perturb_scale,
         perturb_pose=perturb_pose,
         render_strategy=render_strategy,
+        do_render=do_render,
     )
     model = select_model(model_name=model_name, render_path=render_path, do_render=do_render)
     model.logdir = logdir
