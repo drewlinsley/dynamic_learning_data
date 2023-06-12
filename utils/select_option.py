@@ -11,8 +11,9 @@ url_co3d_list = "https://drive.google.com/uc?id=1jCDaA41ZddkgPl4Yw2h-XI7mt9o56kb
 def select_model(
     model_name: str,
     render_path: str,
+    do_render: bool,
 ):  
-    return LitPlenoxel(render_path=render_path)
+    return LitPlenoxel(render_path=render_path, do_render=do_render)
 
 
 def select_dataset(

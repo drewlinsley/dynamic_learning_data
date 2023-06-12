@@ -32,9 +32,10 @@ def clear_scene_render_dir(scene, render_path="render"):
     process = subprocess.run(['rm', '-r', scene_render_dir])
     return process.returncode
 
-def generate_images(scene, gpu_id, render_path, render_strategy):
+def generate_images(scene, gpu_id, render_path, render_strategy, do_render):
     cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path} --render_strategy {render_strategy}"
     cmd = cmd_str.split()
+    cmd += ['--no-render'] if not do_render else []
     print(f"Generating images for scene {scene}...")
     process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
     print(f"Scene {scene} complete")
@@ -88,12 +89,12 @@ def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("scenes", nargs="*")
-    parser.add_argument("--generate", action="store_true", default=True)
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
     parser.add_argument("-g", "--gpu_id", type=int, default=0)
     parser.add_argument("--all", action="store_true", default=False)
     parser.add_argument("--render_path", type=str, default="render")
     parser.add_argument("-s", "--render_strategy", type=str, default="canonical")
+    parser.add_argument("--no-render", dest="render", action="store_false")
 
     args = parser.parse_args()
 
@@ -106,7 +107,11 @@ if __name__ == "__main__":
         if args.generate:
             return_code = clear_scene_render_dir(scene, render_path=args.render_path)
             try:
-                return_code = generate_images(scene, args.gpu_id, args.render_path, args.render_strategy)
+                return_code = generate_images(scene,
+                                              args.gpu_id,
+                                              args.render_path,
+                                              args.render_strategy,
+                                              args.render)
             except:
                 return_code = -1
 
