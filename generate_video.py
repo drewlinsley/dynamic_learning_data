@@ -67,7 +67,7 @@ def generate_video(scene, render_path="render"):
     print(f"Completed processing {cls}, {scene}")
     return
 
-def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
+def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = list(co3d_lists.keys())
     num_devices = len(devices)
@@ -79,6 +79,7 @@ def generate_all_scenes(devices=[1,2,3,4,5,6,7]):
 
     for i in range(num_devices):
         cmd = ["python", "generate_video.py", "--gpu_id", str(devices[i])] + scene_dist[i]
+        cmd += flags
         process = subprocess.Popen(cmd)
         processes.append(process)
 
@@ -100,7 +101,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.all:
-        generate_all_scenes()
+        remove = args.scenes + [sys.argv[0], "--all"]
+        flags = [flag for flag in sys.argv[1:] if flag not in remove]
+        generate_all_scenes(flags)
         exit()
 
     for scene in args.scenes:
