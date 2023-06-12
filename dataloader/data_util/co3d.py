@@ -95,7 +95,7 @@ def similarity_from_cameras(c2w, fix_rot=False):
 def process_frame(frame, context):
     datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs = context
     img = None
-    if not read_imgs:
+    if read_imgs:
         img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
         # # open jpeg file
         # in_file = open(os.path.join(datadir, frame["image"]["path"]), 'rb')
@@ -111,7 +111,7 @@ def process_frame(frame, context):
     if approx_scale < 1.0:
         H2 = int(approx_scale * H)
         W2 = int(approx_scale * W)
-        if not read_imgs:
+        if read_imgs:
             img = cv2.resize(img, (W2, H2), interpolation=cv2.INTER_AREA)
     else:
         H2 = H
