@@ -166,13 +166,16 @@ def run(
         trainer.test(model, data_module, ckpt_path=ckpt_path)
 
     if run_render:
-        ckpts = np.load("co3d_paths.npy", allow_pickle=True).tolist() 
-        # ckpt_path = "PeRFception-v1-2/56/plenoxel_co3d_350_36756_68956/last.ckpt"
-        # ckpt_name is the directory above 'last.ckpt'
-        ckpt_path_prefix = os.path.sep.join(ckpt_path.split(os.path.sep)[:-3])
-        ckpt_name = ckpt_path.split(os.path.sep)[-2]
-        prefix = ckpts[ckpt_name]
-        ckpt_path = os.path.join(ckpt_path_prefix, prefix, ckpt_name, ckpt_path.split(os.path.sep)[-1])
+        if do_render:
+            ckpts = np.load("co3d_paths.npy", allow_pickle=True).tolist()
+            # ckpt_path = "PeRFception-v1-2/56/plenoxel_co3d_350_36756_68956/last.ckpt"
+            # ckpt_name is the directory above 'last.ckpt'
+            ckpt_path_prefix = os.path.sep.join(ckpt_path.split(os.path.sep)[:-3])
+            ckpt_name = ckpt_path.split(os.path.sep)[-2]
+            prefix = ckpts[ckpt_name]
+            ckpt_path = os.path.join(ckpt_path_prefix, prefix, ckpt_name, ckpt_path.split(os.path.sep)[-1])
+        else:
+            ckpt_path = None
         trainer.predict(model, data_module, ckpt_path=ckpt_path)
 
 
