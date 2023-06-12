@@ -23,7 +23,8 @@ def select_dataset(
     num_gpus: int,
     num_tpus: int,
     perturb_scale: float,
-    perturb_pose: float
+    perturb_pose: float,
+    render_strategy: str,
 ):
     if dataset_name == "co3d":
         data_fun = LitDataCo3D
@@ -40,7 +41,8 @@ def select_dataset(
         num_gpus=num_gpus,
         num_tpus=num_tpus,
         perturb_scale=perturb_scale,
-        perturb_pose=perturb_pose
+        perturb_pose=perturb_pose,
+        render_strategy=render_strategy,
     )
 
 def select_callback(model_name):

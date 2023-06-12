@@ -15,6 +15,13 @@ from dataloader.random_pose import random_pose, pose_interp
 from dataloader.spherical_poses import spherical_poses, spherical_trajectories
 from turbojpeg import TurboJPEG
 
+_VALID_RENDERING_STRATEGIES = [
+    "interpolation",
+    "canonical",
+    "spherical",
+    "random",
+]
+
 def find_files(dir, exts):
     if os.path.isdir(dir):
         files_grabbed = []
@@ -153,11 +160,7 @@ def load_co3d_data(
     scene_name: str, 
     max_image_dim: int,
     cam_scale_factor: float,
-    # render_strategy: "spherical",
-    render_scene_interp: bool = False,
-    render_scene_spherical: bool = False,
-    render_scene_trajectory: bool = True,
-    render_random_pose: bool = False,
+    render_strategy: str = "canonical",
     interp_fac: int = 0,
     perturb_pose: float = 0.,
     v2_mode: bool = False
@@ -260,16 +263,16 @@ def load_co3d_data(
     i_split = (i_train, i_val, i_test, i_all)
 
     t_f1 = time.time()
-    if render_random_pose:
-        render_poses = random_pose(extrinsics[i_all], 50)
-    elif render_scene_interp:
-        render_poses = pose_interp(extrinsics[i_all], interp_fac)
-    elif render_scene_spherical:
-        render_poses = spherical_poses(sscale * cam_scale_factor * np.eye(4))
-    elif render_scene_trajectory:
+    if render_strategy == "canonical":
         render_poses = spherical_trajectories(extrinsics[i_all])
+    elif render_strategy == "interpolation":
+        render_poses = pose_interp(extrinsics[i_all], interp_fac)
+    elif render_strategy == "spherical":
+        render_poses = spherical_poses(sscale * cam_scale_factor * np.eye(4))
+    elif render_strategy == "random":
+        render_poses = random_pose(extrinsics[i_all], 50)
     else:
-        raise NotImplementedError("Need a rendering strategy.")
+        raise NotImplementedError(f"Rendering strategy {render_strategy} is not valid.")
     t_f2 = time.time()
     
     near, far = 0., 1.

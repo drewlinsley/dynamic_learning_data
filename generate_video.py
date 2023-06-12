@@ -32,8 +32,8 @@ def clear_scene_render_dir(scene, render_path="render"):
     process = subprocess.run(['rm', '-r', scene_render_dir])
     return process.returncode
 
-def generate_images(scene, gpu_id, render_path):
-    cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path}"
+def generate_images(scene, gpu_id, render_path, render_strategy):
+    cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path} --render_strategy {render_strategy}"
     cmd = cmd_str.split()
     print(f"Generating images for scene {scene}...")
     process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
@@ -93,6 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--gpu_id", type=int, default=0)
     parser.add_argument("--all", action="store_true", default=False)
     parser.add_argument("--render_path", type=str, default="render")
+    parser.add_argument("-s", "--render_strategy", type=str, default="canonical")
 
     args = parser.parse_args()
 
@@ -105,7 +106,7 @@ if __name__ == "__main__":
         if args.generate:
             return_code = clear_scene_render_dir(scene, render_path=args.render_path)
             try:
-                return_code = generate_images(scene, args.gpu_id, args.render_path)
+                return_code = generate_images(scene, args.gpu_id, args.render_path, args.render_strategy)
             except:
                 return_code = -1
 
