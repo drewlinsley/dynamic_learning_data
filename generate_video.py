@@ -32,13 +32,13 @@ def clear_scene_render_dir(scene, render_path="render"):
     process = subprocess.run(['rm', '-r', scene_render_dir])
     return process.returncode
 
-def generate_images(scene, gpu_id, render_path, render_strategy, do_render):
+def generate_images(scene, gpu_id, render_path, render_strategy, do_render, verbose=False):
     cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path} --render_strategy {render_strategy}"
     cmd = cmd_str.split()
     cmd += ['--no-render'] if not do_render else []
     print(f"Generating images for scene {scene}...")
-    #process = subprocess.run(cmd, stdout=subprocess.DEVNULL)
-    process = subprocess.run(cmd)
+    kwargs = {'stdout': subprocess.DEVNULL} if verbose else {}
+    process = subprocess.run(cmd, **kwargs)
     print(f"Scene {scene} complete")
     return process.returncode
 
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--render_path", type=str, default="render")
     parser.add_argument("-s", "--render_strategy", type=str, default="canonical")
     parser.add_argument("--no-render", dest="render", action="store_false")
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -115,7 +116,8 @@ if __name__ == "__main__":
                                               args.gpu_id,
                                               args.render_path,
                                               args.render_strategy,
-                                              args.render)
+                                              args.render,
+                                              verbose=args.verbose)
             except:
                 return_code = -1
 
