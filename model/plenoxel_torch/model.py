@@ -183,6 +183,7 @@ class LitPlenoxel(LitModel):
         density_clip_max: float = 100,
         # Render Option
         bkgd_only: bool = False,
+        save_metadata: bool = True,
         render_path: str = "render",
         # Scannet specific option
         init_grid_with_pcd: bool = True,
@@ -760,6 +761,11 @@ class LitPlenoxel(LitModel):
         if self.bkgd_only:
             np.save(f"{scene_path}/poses.npy", self.trainer.datamodule.render_poses)
             np.save(f"{scene_path}/intrinsics.npy", self.trainer.datamodule.intrinsics)
+
+        if self.save_metadata:
+            np.savez_compressed(f"{scene_path}/{class_name}_{scene_number}.npz",
+                                extrinsics=self.trainer.datamodule.render_poses,
+                                intrinsics=self.trainer.datamodule.intrinsics)
 
     def validation_epoch_end(self, outputs):
         val_image_sizes = self.trainer.datamodule.val_image_sizes
