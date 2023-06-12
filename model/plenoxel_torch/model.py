@@ -185,6 +185,7 @@ class LitPlenoxel(LitModel):
         bkgd_only: bool = False,
         save_metadata: bool = True,
         render_path: str = "render",
+        do_render: bool = True,
         # Scannet specific option
         init_grid_with_pcd: bool = True,
         upsample_stride: int = 1,
@@ -656,6 +657,10 @@ class LitPlenoxel(LitModel):
 
     def predict_step(self, batch, batch_idx):
         ret = {}
+
+        if not self.do_render:
+            return ret
+
         if self.bkgd_only:
             bg = self.render_rays(
                 batch, batch_idx, cpu=True, prefix="bg", render_bg=True
@@ -724,7 +729,9 @@ class LitPlenoxel(LitModel):
                 image_sizes.dtype
             )
 
-        keys = ["bg/rgb"] if self.bkgd_only else ["fgbg/rgb", "fg/rgb", "mask"]
+        keys = []
+        if self.do_render:
+            keys = ["bg/rgb"] if self.bkgd_only else ["fgbg/rgb", "fg/rgb", "mask"]
 
         rets = {}
         for key in keys:
@@ -745,7 +752,9 @@ class LitPlenoxel(LitModel):
             else:
                 scene_name = self.trainer.datamodule.scene_name
                 scene_path = f"{self.render_path}/{scene_name}"
-            opt_list = ["bg"] if self.bkgd_only else ["fg", "fgbg"]
+            opt_list = []
+            if self.do_render:
+                opt_list = ["bg"] if self.bkgd_only else ["fg", "fgbg"]
 
             os.makedirs(scene_path, exist_ok=True)
             for opt in opt_list:

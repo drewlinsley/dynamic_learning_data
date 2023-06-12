@@ -87,6 +87,7 @@ class LitData(pl.LightningDataModule):
         precrop: bool = False,
         precrop_steps: int = 0, 
         manipulate_intrinsics: bool = False,
+        do_render: bool = True,
     ):
         super(LitData, self).__init__()
         for name, value in vars().items():
@@ -120,9 +121,12 @@ class LitData(pl.LightningDataModule):
         
         if stage == "predict" or stage is None:
             render_poses = np.stack(self.render_poses)
-            self.predict_dset, self.pred_dummy = self.split_each(
-                None, render_poses, np.arange(len(render_poses))
-            )
+            # Generating rays is slow, skip if not needed
+            self.predict_dset, self.pred_dummy = [0], None
+            if self.do_render:
+                self.predict_dset, self.pred_dummy = self.split_each(
+                    None, render_poses, np.arange(len(render_poses))
+                )
 
     def split_each(
         self, 

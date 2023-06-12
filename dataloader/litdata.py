@@ -23,6 +23,7 @@ class LitDataCo3D(LitData):
         perturb_pose: float = 0.,
         perturb_scale: float = 0.,
         render_strategy: str = "canonical",
+        do_render: bool = True,
     ):
         if perturb_scale:
             sign = np.sign(np.random.rand() - perturb_scale)
@@ -57,6 +58,7 @@ class LitDataCo3D(LitData):
             accelerator=accelerator,
             num_gpus=num_gpus,
             num_tpus=num_tpus,
+            do_render=do_render,
         )
 
 

@@ -11,8 +11,9 @@ url_co3d_list = "https://drive.google.com/uc?id=1jCDaA41ZddkgPl4Yw2h-XI7mt9o56kb
 def select_model(
     model_name: str,
     render_path: str,
+    do_render: bool,
 ):  
-    return LitPlenoxel(render_path=render_path)
+    return LitPlenoxel(render_path=render_path, do_render=do_render)
 
 
 def select_dataset(
@@ -25,6 +26,7 @@ def select_dataset(
     perturb_scale: float,
     perturb_pose: float,
     render_strategy: str,
+    do_render: bool,
 ):
     if dataset_name == "co3d":
         data_fun = LitDataCo3D
@@ -43,6 +45,7 @@ def select_dataset(
         perturb_scale=perturb_scale,
         perturb_pose=perturb_pose,
         render_strategy=render_strategy,
+        do_render=do_render,
     )
 
 def select_callback(model_name):

@@ -53,6 +53,7 @@ def run(
     log_every_n_steps: int = 1000,
     progressbar_refresh_rate: int = 5,
     # Run Mode
+    do_render: bool = True,
     render_strategy: str = "canonical",
     run_train: bool = True,
     run_eval: bool = True,
@@ -150,8 +151,9 @@ def run(
         perturb_scale=perturb_scale,
         perturb_pose=perturb_pose,
         render_strategy=render_strategy,
+        do_render=do_render,
     )
-    model = select_model(model_name=model_name, render_path=render_path)
+    model = select_model(model_name=model_name, render_path=render_path, do_render=do_render)
     model.logdir = logdir
     if run_train:
         trainer.fit(model, data_module, ckpt_path=ckpt_path)
@@ -164,13 +166,16 @@ def run(
         trainer.test(model, data_module, ckpt_path=ckpt_path)
 
     if run_render:
-        ckpts = np.load("co3d_paths.npy", allow_pickle=True).tolist() 
-        # ckpt_path = "PeRFception-v1-2/56/plenoxel_co3d_350_36756_68956/last.ckpt"
-        # ckpt_name is the directory above 'last.ckpt'
-        ckpt_path_prefix = os.path.sep.join(ckpt_path.split(os.path.sep)[:-3])
-        ckpt_name = ckpt_path.split(os.path.sep)[-2]
-        prefix = ckpts[ckpt_name]
-        ckpt_path = os.path.join(ckpt_path_prefix, prefix, ckpt_name, ckpt_path.split(os.path.sep)[-1])
+        if do_render:
+            ckpts = np.load("co3d_paths.npy", allow_pickle=True).tolist()
+            # ckpt_path = "PeRFception-v1-2/56/plenoxel_co3d_350_36756_68956/last.ckpt"
+            # ckpt_name is the directory above 'last.ckpt'
+            ckpt_path_prefix = os.path.sep.join(ckpt_path.split(os.path.sep)[:-3])
+            ckpt_name = ckpt_path.split(os.path.sep)[-2]
+            prefix = ckpts[ckpt_name]
+            ckpt_path = os.path.join(ckpt_path_prefix, prefix, ckpt_name, ckpt_path.split(os.path.sep)[-1])
+        else:
+            ckpt_path = None
         trainer.predict(model, data_module, ckpt_path=ckpt_path)
 
 
@@ -227,6 +232,11 @@ if __name__ == "__main__":
         type=str,
         default="canonical",
     )
+    parser.add_argument(
+        "--no-render",
+        dest="render",
+        action="store_false",
+    )
     args = parser.parse_args()
 
     ginbs = []
@@ -244,4 +254,5 @@ if __name__ == "__main__":
         entity=args.entity,
         gpu_id=args.gpu_id,
         render_strategy=args.render_strategy,
+        do_render=args.render,
     )
