@@ -110,7 +110,8 @@ if __name__ == "__main__":
     for scene in args.scenes:
         return_code = 0
         if args.generate:
-            return_code = clear_scene_render_dir(scene, render_path=args.render_path)
+            if args.render:
+                return_code = clear_scene_render_dir(scene, render_path=args.render_path)
             try:
                 return_code = generate_images(scene,
                                               args.gpu_id,
