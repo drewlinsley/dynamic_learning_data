@@ -21,7 +21,8 @@ class LitDataCo3D(LitData):
         max_image_dim: int = 800,
         cam_scale_factor: float = 1.50,
         perturb_pose: float = 0.,
-        perturb_scale: float = 0.
+        perturb_scale: float = 0.,
+        render_strategy: str = "canonical",
     ):
         if perturb_scale:
             sign = np.sign(np.random.rand() - perturb_scale)
@@ -44,7 +45,8 @@ class LitDataCo3D(LitData):
             scene_name=scene_name,
             max_image_dim=max_image_dim,
             cam_scale_factor=cam_scale_factor,
-            perturb_pose=perturb_pose
+            perturb_pose=perturb_pose,
+            render_strategy=render_strategy,
         )
 
         self.render_scale = 300 / max(self.image_sizes[0][0], self.image_sizes[0][1])

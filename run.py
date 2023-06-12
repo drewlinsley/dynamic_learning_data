@@ -53,6 +53,7 @@ def run(
     log_every_n_steps: int = 1000,
     progressbar_refresh_rate: int = 5,
     # Run Mode
+    render_strategy: str = "canonical",
     run_train: bool = True,
     run_eval: bool = True,
     run_render: bool = False,
@@ -147,7 +148,8 @@ def run(
         num_gpus=num_gpus,
         num_tpus=num_tpus,
         perturb_scale=perturb_scale,
-        perturb_pose=perturb_pose
+        perturb_pose=perturb_pose,
+        render_strategy=render_strategy,
     )
     model = select_model(model_name=model_name, render_path=render_path)
     model.logdir = logdir
@@ -220,6 +222,11 @@ if __name__ == "__main__":
         type=str,
         default="render",
     )
+    parser.add_argument(
+        "--render_strategy",
+        type=str,
+        default="canonical",
+    )
     args = parser.parse_args()
 
     ginbs = []
@@ -236,4 +243,5 @@ if __name__ == "__main__":
         scene_name=args.scene_name,
         entity=args.entity,
         gpu_id=args.gpu_id,
+        render_strategy=args.render_strategy,
     )
