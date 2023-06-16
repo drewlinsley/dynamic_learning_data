@@ -18,6 +18,8 @@ from turbojpeg import TurboJPEG
 _VALID_RENDERING_STRATEGIES = [
     "interpolation",
     "canonical",
+    "canonical-linear",
+    "canonical-planar",
     "spherical",
     "random",
 ]
@@ -267,6 +269,12 @@ def load_co3d_data(
     t_f1 = time.time()
     if render_strategy == "canonical":
         render_poses, misc = spherical_trajectories(extrinsics[i_all])
+        extra_data.update(misc)
+    elif render_strategy == "canonical-linear":
+        render_poses, misc = spherical_trajectories(extrinsics[i_all], strategy="linear")
+        extra_data.update(misc)
+    elif render_strategy == "canonical-planar":
+        render_poses, misc = spherical_trajectories(extrinsics[i_all], strategy="planar")
         extra_data.update(misc)
     elif render_strategy == "interpolation":
         render_poses = pose_interp(extrinsics[i_all], interp_fac)
