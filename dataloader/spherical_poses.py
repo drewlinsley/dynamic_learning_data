@@ -200,7 +200,8 @@ def estimate_winding(positions, up=np.array([0., -1., 0.])):
 def spherical_trajectories(extrinsics):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
-    all_pos = np.copy(extrinsics[:, :3, 3].reshape(-1, 3))
+    # Some co3d trajectories have a bad first frame, so skip (e.g. 106_12659_23914)
+    all_pos = np.copy(extrinsics[1:, :3, 3].reshape(-1, 3))
     mean_pos = np.mean(all_pos, axis=0, keepdims=True)
     all_pos -= mean_pos
 
