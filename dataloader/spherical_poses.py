@@ -197,20 +197,16 @@ def estimate_winding(positions, up=np.array([0., -1., 0.])):
 
     return theta
 
-def spherical_trajectories(extrinsics):
-    # Extrinsics describes camera pose in world frame with OpenCV convention:
-    # z+ in, y+ down, x+ right
-    # Some co3d trajectories have a bad first frame, so skip (e.g. 106_12659_23914)
-    all_pos = np.copy(extrinsics[1:, :3, 3].reshape(-1, 3))
-    mean_pos = np.mean(all_pos, axis=0, keepdims=True)
-    all_pos -= mean_pos
+def fit_points(points):
+    mean_pos = np.mean(points, axis=0, keepdims=True)
+    points -= mean_pos
 
-    mid_idx = all_pos.shape[0] // 2
-    start_t = all_pos[0, :]
-    mid_t = all_pos[mid_idx, :]
-    end_t = all_pos[-1, :]
+    mid_idx = points.shape[0] // 2
+    start_t = points[0, :]
+    mid_t = points[mid_idx, :]
+    end_t = points[-1, :]
 
-    U, D, VT = np.linalg.svd(all_pos)
+    U, D, VT = np.linalg.svd(points)
     V = VT.T
     ratio_1 = D[0] / D[1]
     ratio_2 = D[1] / D[2]
@@ -221,7 +217,7 @@ def spherical_trajectories(extrinsics):
         plane_normal = V[:, 2]
         up = np.array([0., -1., 0.])
         d = np.dot(plane_normal, up)
-        signed_theta = estimate_winding(all_pos)
+        signed_theta = estimate_winding(points)
         # Align plane normal with estimated winding direction
         plane_normal = plane_normal if np.sign(d) == np.sign(signed_theta) else -1*plane_normal
         positions = get_spherical_trajectory(start_t, end_t, winding=signed_theta, plane_normal=plane_normal)
@@ -230,18 +226,6 @@ def spherical_trajectories(extrinsics):
         positions = get_linear_trajectory(start_t, end_t)
     positions += mean_pos
 
-
-    mats = []
-    for i in range(positions.shape[0]):
-        t = positions[i, :]
-        #TODO: Figure out why up=[0, -1, 0] isn't correct
-        R = look_at_rotation(t)
-        E = np.eye(4)
-        E[:3, :3] = R
-        E[:3, 3] = t
-        mats.append(E[np.newaxis, ...])
-
-    mats = np.vstack(mats)
     extra_data = {
       'D': D,
       'V': V,
@@ -249,4 +233,29 @@ def spherical_trajectories(extrinsics):
       'end': end_t,
       'is_planar': is_planar,
     }
+
+    return positions, extra_data
+
+def spherical_trajectories(extrinsics):
+    # Extrinsics describes camera pose in world frame with OpenCV convention:
+    # z+ in, y+ down, x+ right
+    # Some co3d trajectories have a bad first frame, so skip (e.g. 106_12659_23914)
+    all_pos = np.copy(extrinsics[1:, :3, 3].reshape(-1, 3))
+    positions, extra_data = fit_points(all_pos)
+
+    all_z = np.copy(extrinsics[1:, :3, 2].reshape(-1, 3))
+    zs, _ = fit_points(all_z)
+
+    mats = []
+    for i in range(positions.shape[0]):
+        t = positions[i, :]
+        z = zs[i, :]
+        #TODO: Figure out why up=[0, -1, 0] isn't correct
+        R = look_at_rotation(t, at=t+z)
+        E = np.eye(4)
+        E[:3, :3] = R
+        E[:3, 3] = t
+        mats.append(E[np.newaxis, ...])
+
+    mats = np.vstack(mats)
     return mats, extra_data
