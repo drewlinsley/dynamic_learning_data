@@ -208,12 +208,11 @@ def fit_points(points):
 
     U, D, VT = np.linalg.svd(points)
     V = VT.T
-    ratio_1 = D[0] / D[1]
-    ratio_2 = D[1] / D[2]
-    # If third dim contributes significantly less info than second dim, assume planar
-    # Otherwise, assume linear or spherical and fit linear trajectory
     is_planar = False
-    if 2.*ratio_1 < ratio_2:
+    # If first dimension significantly dominates the second, assume linear fit is best
+    if (D[0] / D[1]) > 4.:
+        positions = get_linear_trajectory(start_t, end_t)
+    else:
         plane_normal = V[:, 2]
         up = np.array([0., -1., 0.])
         d = np.dot(plane_normal, up)
@@ -222,8 +221,6 @@ def fit_points(points):
         plane_normal = plane_normal if np.sign(d) == np.sign(signed_theta) else -1*plane_normal
         positions = get_spherical_trajectory(start_t, end_t, winding=signed_theta, plane_normal=plane_normal)
         is_planar = True
-    else:
-        positions = get_linear_trajectory(start_t, end_t)
     positions += mean_pos
 
     extra_data = {
