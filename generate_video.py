@@ -37,7 +37,7 @@ def generate_images(scene, gpu_id, render_path, render_strategy, do_render, verb
     cmd = cmd_str.split()
     cmd += ['--no-render'] if not do_render else []
     print(f"Generating images for scene {scene}...")
-    kwargs = {'stdout': subprocess.DEVNULL} if verbose else {}
+    kwargs = {'stdout': subprocess.DEVNULL} if not verbose else {}
     process = subprocess.run(cmd, **kwargs)
     print(f"Scene {scene} complete")
     return process.returncode
@@ -107,7 +107,8 @@ if __name__ == "__main__":
         generate_all_scenes(flags)
         exit()
 
-    for scene in args.scenes:
+    for idx, scene in enumerate(args.scenes):
+        print(f"Process {args.gpu_id}, scene {idx} ({100*idx/len(args.scenes):.2f}%)")
         return_code = 0
         if args.generate:
             if args.render:
