@@ -158,8 +158,8 @@ def get_spherical_trajectory(start_pos, end_pos, winding=None, plane_normal=None
         ]
     )
 
-    angles = np.linspace(0., angle_rad, num_steps+1)
-    radii = np.linspace(start_t_r, end_t_r, num_steps+1)
+    angles = np.linspace(0., angle_rad, num_steps)
+    radii = np.linspace(start_t_r, end_t_r, num_steps)
     rots =  np.eye(3) + \
             scale_matrix_by_coeffs(skew, np.sin(angles)) + \
             scale_matrix_by_coeffs((skew @ skew), (1. - np.cos(angles)))
@@ -176,7 +176,7 @@ def get_linear_trajectory(start_pos, end_pos, num_steps=50):
     diff_mag = np.linalg.norm(diff)
     diff_hat = diff / diff_mag
 
-    dists = np.linspace(0., diff_mag, num_steps+1)
+    dists = np.linspace(0., diff_mag, num_steps)
     positions = scale_matrix_by_coeffs(diff_hat, dists)
     positions += start_t
     return positions
@@ -197,20 +197,19 @@ def estimate_winding(positions, up=np.array([0., -1., 0.])):
 
     return theta
 
-def fit_points(points):
+def fit_points(points, strategy=None):
     mean_pos = np.mean(points, axis=0, keepdims=True)
     points -= mean_pos
 
     mid_idx = points.shape[0] // 2
     start_t = points[0, :]
-    mid_t = points[mid_idx, :]
     end_t = points[-1, :]
 
     U, D, VT = np.linalg.svd(points)
     V = VT.T
     is_planar = False
     # If first dimension significantly dominates the second, assume linear fit is best
-    if (D[0] / D[1]) > 4.:
+    if (strategy is None and (D[0] / D[1]) > 4.) or strategy == "linear":
         positions = get_linear_trajectory(start_t, end_t)
     else:
         plane_normal = V[:, 2]
@@ -233,15 +232,15 @@ def fit_points(points):
 
     return positions, extra_data
 
-def spherical_trajectories(extrinsics):
+def spherical_trajectories(extrinsics, strategy=None):
     # Extrinsics describes camera pose in world frame with OpenCV convention:
     # z+ in, y+ down, x+ right
     # Some co3d trajectories have a bad first frame, so skip (e.g. 106_12659_23914)
     all_pos = np.copy(extrinsics[1:, :3, 3].reshape(-1, 3))
-    positions, extra_data = fit_points(all_pos)
+    positions, extra_data = fit_points(all_pos, strategy=strategy)
 
     all_z = np.copy(extrinsics[1:, :3, 2].reshape(-1, 3))
-    zs, _ = fit_points(all_z)
+    zs, _ = fit_points(all_z, strategy='planar')
 
     mats = []
     for i in range(positions.shape[0]):
