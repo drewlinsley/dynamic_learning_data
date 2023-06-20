@@ -2,6 +2,7 @@ import argparse
 import os
 import json
 import signal
+import shutil
 import subprocess
 import sys
 import torch
@@ -35,7 +36,7 @@ def clear_scene_render_dir(scene, render_path="render"):
 def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = list(co3d_lists.keys())
-    scenes = scenes[:7]
+    scenes = scenes[:2]
     num_devices = len(devices)
     scenes_per_device = len(scenes) // num_devices
     scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
@@ -55,9 +56,6 @@ def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
             time.sleep(0.5)
 
 def process_scenes(scenes, rank):
-    print(rank)
-    print(scenes)
-    print(processes)
     co3d_lists = get_co3d_list()
     path_prefix = "/media/data_cifs/projects/prj_video_imagenet/PeRFception"
     linear_path_prefix = os.path.join(path_prefix, "render_canonical_linear")
@@ -67,23 +65,32 @@ def process_scenes(scenes, rank):
     batch_size = 50
     dims = 2048
 
-    for scene in scenes:
+    for idx, scene in enumerate(scenes):
+        print(f"Process {rank}, scene {idx}/{len(scenes)} ({100*idx/len(scenes):.2f}%)")
         category = co3d_lists[scene]
-        linear_path = os.path.join(linear_path_prefix, category, scene, "fgbg")
-        planar_path = os.path.join(planar_path_prefix, category, scene, "fgbg")
-        interp_path = os.path.join(interp_path_prefix, category, scene, "fgbg")
-        cmd = ["python", "-m", "pytorch_fid", interp_path, linear_path]
+        linear_path = os.path.join(linear_path_prefix, category, scene)
+        linear_path_fgbg = os.path.join(linear_path, "fgbg")
+        planar_path = os.path.join(planar_path_prefix, category, scene)
+        planar_path_fgbg = os.path.join(planar_path, "fgbg")
+        interp_path = os.path.join(interp_path_prefix, category, scene)
+        interp_path_fgbg = os.path.join(interp_path, "fgbg")
+        module = "pytorch_fid"
+        cmd = ["python", "-m", module, interp_path_fgbg, linear_path_fgbg]
         flags = ["--device", f"cuda:{rank}", "--num-workers", "4"]
         cmd += flags
         output = subprocess.check_output(cmd).decode("utf-8")
         fid_linear = float(output.split()[-1])
-        cmd = ["python", "-m", "pytorch_fid", interp_path, planar_path]
+        cmd = ["python", "-m", module, interp_path_fgbg, planar_path_fgbg]
         flags = ["--device", f"cuda:{rank}", "--num-workers", "4"]
         cmd += flags
         output = subprocess.check_output(cmd).decode("utf-8")
         fid_planar = float(output.split()[-1])
         print(f"FID values for {category}/{scene}: linear: {fid_linear:.2f}, planar: {fid_planar:.2f}")
 
+        src_dir = planar_path if fid_planar < fid_linear else linear_path
+        dest_dir = os.path.join(output_path_prefix, category, scene)
+        shutil.rmtree(dest_dir)
+        shutil.copytree(src_dir, dest_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
