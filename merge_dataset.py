@@ -36,7 +36,6 @@ def clear_scene_render_dir(scene, render_path="render"):
 def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = list(co3d_lists.keys())
-    scenes = scenes[:2]
     num_devices = len(devices)
     scenes_per_device = len(scenes) // num_devices
     scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
@@ -47,7 +46,6 @@ def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
     for i in range(num_devices):
         cmd = ["python", __file__, "--gpu_id", str(devices[i])] + scene_dist[i]
         cmd += flags
-        print(cmd)
         process = subprocess.Popen(cmd)
         processes.append(process)
 
@@ -86,11 +84,17 @@ def process_scenes(scenes, rank):
         output = subprocess.check_output(cmd).decode("utf-8")
         fid_planar = float(output.split()[-1])
         print(f"FID values for {category}/{scene}: linear: {fid_linear:.2f}, planar: {fid_planar:.2f}")
-
-        src_dir = planar_path if fid_planar < fid_linear else linear_path
+        fid_is_planar = fid_planar < fid_linear
+        src_dir = planar_path if fid_is_planar else linear_path
         dest_dir = os.path.join(output_path_prefix, category, scene)
-        shutil.rmtree(dest_dir)
+        shutil.rmtree(dest_dir, ignore_errors=True)
         shutil.copytree(src_dir, dest_dir)
+        npz_filename = os.path.join(dest_dir, f"{category}_{scene}.npz")
+        with np.load(npz_filename) as data:
+            d = {}
+            d.update(data)
+            d['fid_is_planar'] = np.array(fid_is_planar)
+            np.savez_compressed(npz_filename, **d)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
