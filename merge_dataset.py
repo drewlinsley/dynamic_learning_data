@@ -94,6 +94,8 @@ def process_scenes(scenes, rank):
             d = {}
             d.update(data)
             d['fid_is_planar'] = np.array(fid_is_planar)
+            d['fid_score_planar'] = np.array(fid_planar)
+            d['fid_score_linear'] = np.array(fid_linear)
             np.savez_compressed(npz_filename, **d)
 
 if __name__ == "__main__":
