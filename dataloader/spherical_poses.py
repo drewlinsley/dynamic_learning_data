@@ -127,28 +127,27 @@ def get_spherical_trajectory(start_pos, end_pos, winding=None, plane_normal=None
 
     # If we have a winding, then we're trying to match some given trajectory data
     if winding is not None:
-        num_winds = np.abs(winding) // (2*np.pi)
-        winds_rad = num_winds * (2*np.pi)
         # There are four cases to distinguish:
         # End vec is "in front" or "behind" start vec (sign of cross dot up)
         # Trajectory should wind right or left (sign of winding)
+        # Assume we only ever want to make at most one revolution around object
         d = np.dot(start_end_cross, up)
         # If end is in front of start and we go right -> full rev
         # e.g. scene 101_11758_21048
         if d >= 0. and winding >= 0.:
-            angle_rad = winds_rad + angle_rad
+            angle_rad = 2*np.pi + angle_rad
         # end is in front and we go left -> partial rev
         # e.g. truncate scene 253_27225_54554
         elif d >= 0. and winding < 0.:
-            angle_rad = winds_rad + (2*np.pi - angle_rad)
+            angle_rad = 2*np.pi - angle_rad
         # end is behind and we go right -> partial rev
         # e.g. scene 108_12889_25676
         elif d < 0. and winding >= 0.:
-            angle_rad = winds_rad + (2*np.pi - angle_rad)
+            angle_rad = 2*np.pi - angle_rad
         # end is behind and we go left -> full rev
         # e.g. scene 253_27225_54554
         else: # d < 0. and winding < 0:
-            angle_rad = winds_rad + angle_rad
+            angle_rad = 2*np.pi + angle_rad
 
     skew = np.array(
         [
