@@ -13,3 +13,5 @@ gdown
 plyfile
 connected-components-3d
 PyTurboJPEG
+jupyter
+pytorch-fid
