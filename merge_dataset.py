@@ -87,8 +87,8 @@ def process_scenes(scenes, rank):
         fid_is_planar = fid_planar < fid_linear
         src_dir = planar_path if fid_is_planar else linear_path
         dest_dir = os.path.join(output_path_prefix, category, scene)
-        shutil.rmtree(dest_dir, ignore_errors=True)
-        shutil.copytree(src_dir, dest_dir)
+        _ = subprocess.run(["rm", "-rf", dest_dir])
+        _ = subprocess.run(["cp", "-r", src_dir, dest_dir])
         npz_filename = os.path.join(dest_dir, f"{category}_{scene}.npz")
         with np.load(npz_filename) as data:
             d = {}
