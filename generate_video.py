@@ -20,7 +20,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 def get_co3d_list():
-    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list_good.json"
+    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list.json"
     with open(co3d_list_rel_path) as fp:
         co3d_list = json.load(fp)
     return co3d_list

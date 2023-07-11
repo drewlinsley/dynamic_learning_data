@@ -21,7 +21,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 def get_co3d_list():
-    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list_good.json"
+    co3d_list_rel_path = "dataloader/co3d_lists/co3d_list.json"
     with open(co3d_list_rel_path) as fp:
         co3d_list = json.load(fp)
     return co3d_list
@@ -87,6 +87,7 @@ def process_scenes(scenes, rank):
         fid_is_planar = fid_planar < fid_linear
         src_dir = planar_path if fid_is_planar else linear_path
         dest_dir = os.path.join(output_path_prefix, category, scene)
+        os.makedirs(dest_dir, exist_ok=True)
         _ = subprocess.run(["rm", "-rf", dest_dir])
         _ = subprocess.run(["cp", "-r", src_dir, dest_dir])
         npz_filename = os.path.join(dest_dir, f"{category}_{scene}.npz")
