@@ -2,9 +2,10 @@ import gzip
 import json
 import os
 
-co3d_path = "/media/data_cifs/projects/prj_video_imagenet/PeRFception/data/co3d"
-annotation_output_path = "./co3d_annotations"
-categories = [category for category in os.listdir(co3d_path) if '_' not in category]
+data_root = "/media/data_cifs/projects/prj_video_imagenet/PeRFception/data"
+co3d_path = os.path.join(data_root, "co3d")
+annotation_output_path = os.path.join(data_root, "co3d_annotations")
+categories = [category for category in os.listdir(co3d_path) if os.path.isdir(os.path.join(co3d_path, category))]
 annotations_name = "frame_annotations.jgz"
 for category in categories:
     scenes_to_frames = {}
