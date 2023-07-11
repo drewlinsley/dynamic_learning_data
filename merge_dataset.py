@@ -26,13 +26,6 @@ def get_co3d_list():
         co3d_list = json.load(fp)
     return co3d_list
 
-def clear_scene_render_dir(scene, render_path="render"):
-    co3d_list = get_co3d_list()
-    cls = co3d_list[scene]
-    scene_render_dir = os.path.join(render_path, cls, scene)
-    process = subprocess.run(['rm', '-r', scene_render_dir])
-    return process.returncode
-
 def generate_scenes_for_categories(categories, flags, devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
     scenes = []
@@ -56,9 +49,8 @@ def generate_scenes_for_categories(categories, flags, devices=[1,2,3,4,5,6,7]):
         while p.poll() == None:
             time.sleep(0.5)
 
-def process_scenes(scenes, rank):
+def process_scenes(scenes, rank, path_prefix):
     co3d_lists = get_co3d_list()
-    path_prefix = "/media/data_cifs/projects/prj_video_imagenet/PeRFception"
     linear_path_prefix = os.path.join(path_prefix, "render_canonical_linear")
     planar_path_prefix = os.path.join(path_prefix, "render_canonical_planar")
     interp_path_prefix = os.path.join(path_prefix, "render_interp")
@@ -76,6 +68,7 @@ def process_scenes(scenes, rank):
         interp_path = os.path.join(interp_path_prefix, category, scene)
         interp_path_fgbg = os.path.join(interp_path, "fgbg")
         module = "pytorch_fid"
+
         cmd = ["python", "-m", module, interp_path_fgbg, linear_path_fgbg]
         flags = ["--device", f"cuda:{rank}", "--num-workers", "4"]
         cmd += flags
@@ -88,6 +81,7 @@ def process_scenes(scenes, rank):
         fid_planar = float(output.split()[-1])
         print(f"FID values for {category}/{scene}: linear: {fid_linear:.2f}, planar: {fid_planar:.2f}")
         fid_is_planar = fid_planar < fid_linear
+
         src_dir = planar_path if fid_is_planar else linear_path
         dest_dir = os.path.join(output_path_prefix, category, scene)
         os.makedirs(dest_dir, exist_ok=True)
@@ -108,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
     parser.add_argument("-g", "--gpu_id", type=int, default=0)
     parser.add_argument("-c", "--categories", type=str, default=None)
-    parser.add_argument("--render_path", type=str, default="render")
+    parser.add_argument("--render_path_prefix", type=str, default="/media/data_cifs/projects/prj_video_imagenet/PeRFception")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False)
 
     args = parser.parse_args()
@@ -122,4 +116,4 @@ if __name__ == "__main__":
         generate_scenes_for_categories(categories, flags)
         exit()
 
-    process_scenes(scenes, args.gpu_id)
+    process_scenes(scenes, args.gpu_id, args.render_path_prefix)
