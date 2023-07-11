@@ -33,9 +33,12 @@ def clear_scene_render_dir(scene, render_path="render"):
     process = subprocess.run(['rm', '-r', scene_render_dir])
     return process.returncode
 
-def generate_all_scenes(flags, devices=[1,2,3,4,5,6,7]):
+def generate_scenes_for_categories(categories, flags, devices=[1,2,3,4,5,6,7]):
     co3d_lists = get_co3d_list()
-    scenes = list(co3d_lists.keys())
+    scenes = []
+    for scene, scene_category in co3d_lists.items():
+        if scene_category in categories or "all" in categories:
+            scenes.append(scene)
     num_devices = len(devices)
     scenes_per_device = len(scenes) // num_devices
     scene_dist = [scenes[i*scenes_per_device:(i+1)*scenes_per_device] for i in range(num_devices)]
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("scenes", nargs="*")
     parser.add_argument("-n", "--no-generate", dest="generate", action="store_false")
     parser.add_argument("-g", "--gpu_id", type=int, default=0)
-    parser.add_argument("--all", action="store_true", default=False)
+    parser.add_argument("-c", "--categories", type=str, default=None)
     parser.add_argument("--render_path", type=str, default="render")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False)
 
@@ -112,10 +115,11 @@ if __name__ == "__main__":
 
     scenes = args.scenes
 
-    if args.all:
-        remove = args.scenes + [sys.argv[0], "--all"]
+    if args.categories is not None:
+        remove = args.scenes + ["-c", args.categories]
         flags = [flag for flag in sys.argv[1:] if flag not in remove]
-        generate_all_scenes(flags)
+        categories = args.categories.split(',')
+        generate_scenes_for_categories(categories, flags)
         exit()
 
     process_scenes(scenes, args.gpu_id)
