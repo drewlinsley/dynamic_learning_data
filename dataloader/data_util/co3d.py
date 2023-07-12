@@ -95,7 +95,7 @@ def similarity_from_cameras(c2w, fix_rot=False):
     return transform, scale
 
 def process_frame(frame, context):
-    datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs = context
+    datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs, tgt_img_reso = context
     img = None
     if read_imgs:
         img = cv2.imread(os.path.join(datadir, frame["image"]["path"]))
@@ -139,6 +139,14 @@ def process_frame(frame, context):
     focal = fxy * scale_arr
     prp = -1.0 * (cxy - 1.0) * scale_arr
 
+    if tgt_img_reso is not None:
+        new_image_size = np.array([tgt_img_reso, tgt_img_reso])
+        scale_arr = (image_size / np.linalg.norm(image_size)) * np.linalg.norm(new_image_size) * 0.5
+        scale_arr = np.array([scale_arr[1], scale_arr[0]])
+        focal = fxy * scale_arr
+        prp = [tgt_img_reso * 0.5, tgt_img_reso * 0.5]
+        image_size = new_image_size
+
     pose = np.eye(4)
     pose[:3, :3] = R
     pose[:3, 3:] = -R @ T[..., None]
@@ -165,7 +173,8 @@ def load_co3d_data(
     render_strategy: str = "canonical",
     interp_fac: int = 0,
     perturb_pose: float = 0.,
-    v2_mode: bool = False
+    v2_mode: bool = False,
+    tgt_img_reso: int = None,
 ):
 
     extra_data = {}
@@ -202,7 +211,7 @@ def load_co3d_data(
 
     # TODO: this probably breaks training, fix if we ever plan to do so
     read_imgs = False
-    context = [datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs]
+    context = [datadir, max_image_dim, v2_mode, perturb_pose, cam_trans, read_imgs, tgt_img_reso]
     contexts = [context]*len(frame_data)
 
     with multiprocessing.Pool(processes=4) as pool:

@@ -32,10 +32,11 @@ def clear_scene_render_dir(scene, render_path="render"):
     process = subprocess.run(['rm', '-r', scene_render_dir])
     return process.returncode
 
-def generate_images(scene, gpu_id, render_path, render_strategy, do_render, verbose=False):
+def generate_images(scene, gpu_id, render_path, render_strategy, do_render, resolution=None, verbose=False):
     cmd_str = f"python3 -m run --gpu_id {gpu_id} --ginc configs/PeRFception-v1-1.gin --scene_name {scene} --render_path {render_path} --render_strategy {render_strategy}"
     cmd = cmd_str.split()
     cmd += ['--no-render'] if not do_render else []
+    cmd += ['--resolution', str(resolution)] if resolution is not None else []
     print(f"Generating images for scene {scene}...")
     kwargs = {'stdout': subprocess.DEVNULL} if not verbose else {}
     process = subprocess.run(cmd, **kwargs)
@@ -101,6 +102,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--render_strategy", type=str, default="canonical")
     parser.add_argument("--no-render", dest="render", action="store_false")
     parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False)
+    parser.add_argument("--resolution", type=int, default=None)
 
     args = parser.parse_args()
 
@@ -123,6 +125,7 @@ if __name__ == "__main__":
                                               args.render_path,
                                               args.render_strategy,
                                               args.render,
+                                              resolution=args.resolution,
                                               verbose=args.verbose)
             except:
                 return_code = -1
