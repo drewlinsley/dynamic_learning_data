@@ -24,6 +24,7 @@ class LitDataCo3D(LitData):
         perturb_scale: float = 0.,
         render_strategy: str = "canonical",
         do_render: bool = True,
+        tgt_img_reso: int = None,
     ):
         if perturb_scale:
             sign = np.sign(np.random.rand() - perturb_scale)
@@ -49,9 +50,11 @@ class LitDataCo3D(LitData):
             cam_scale_factor=cam_scale_factor,
             perturb_pose=perturb_pose,
             render_strategy=render_strategy,
+            tgt_img_reso=tgt_img_reso,
         )
 
-        self.render_scale = 300 / max(self.image_sizes[0][0], self.image_sizes[0][1])
+        output_reso = 300 if tgt_img_reso is None else tgt_img_reso
+        self.render_scale = output_reso / max(self.image_sizes[0][0], self.image_sizes[0][1])
 
         super(LitDataCo3D, self).__init__(
             datadir=datadir,

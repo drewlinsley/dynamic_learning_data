@@ -55,6 +55,7 @@ def run(
     # Run Mode
     do_render: bool = True,
     render_strategy: str = "canonical",
+    tgt_img_reso: int = None,
     run_train: bool = True,
     run_eval: bool = True,
     run_render: bool = False,
@@ -152,6 +153,7 @@ def run(
         perturb_pose=perturb_pose,
         render_strategy=render_strategy,
         do_render=do_render,
+        tgt_img_reso=tgt_img_reso,
     )
     model = select_model(model_name=model_name, render_path=render_path, do_render=do_render)
     model.logdir = logdir
@@ -237,7 +239,13 @@ if __name__ == "__main__":
         dest="render",
         action="store_false",
     )
+    parser.add_argument(
+        "--resolution",
+        type=int,
+        default=None,
+    )
     args = parser.parse_args()
+    print(args)
 
     ginbs = []
     if args.ginb:
@@ -255,4 +263,5 @@ if __name__ == "__main__":
         gpu_id=args.gpu_id,
         render_strategy=args.render_strategy,
         do_render=args.render,
+        tgt_img_reso=args.resolution,
     )
