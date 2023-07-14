@@ -58,7 +58,7 @@ def process_scenes(scenes, rank, path_prefix):
         print(f"Process {rank}, scene {idx}/{len(scenes)} ({100*idx/len(scenes):.2f}%)")
         category = co3d_lists[scene]
         scene_path = os.path.join(path_prefix, category, scene)
-        dirs = list(os.scandir(scene_path))
+        dirs = list(os.listdir(scene_path))
         image_dir = "images" if "images" in dirs else "fgbg"
         image_path = os.path.join(scene_path, image_dir)
         output_path = os.path.join(scene_path, f"{category}_{scene}_fidstats.npz")
