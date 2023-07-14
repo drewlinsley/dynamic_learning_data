@@ -61,20 +61,29 @@ def process_scenes(scenes, rank, path_prefix):
     for idx, scene in enumerate(scenes):
         print(f"Process {rank}, scene {idx}/{len(scenes)} ({100*idx/len(scenes):.2f}%)")
         category = co3d_lists[scene]
+        stats_filename = f"{category}_{scene}_fidstats.npz"
         linear_path = os.path.join(linear_path_prefix, category, scene)
-        linear_path_fgbg = os.path.join(linear_path, "fgbg")
+        linear_path_stats = os.path.join(linear_path, stats_filename)
+        linear_path_arg = os.path.join(linear_path, "fgbg")
+        if os.path.isfile(linear_path_stats): linear_path_arg = linear_path_stats
+
         planar_path = os.path.join(planar_path_prefix, category, scene)
-        planar_path_fgbg = os.path.join(planar_path, "fgbg")
+        planar_path_stats = os.path.join(planar_path, stats_filename)
+        planar_path_arg = os.path.join(planar_path, "fgbg")
+        if os.path.isfile(planar_path_stats): planar_path_arg = planar_path_stats
+
         interp_path = os.path.join(interp_path_prefix, category, scene)
-        interp_path_fgbg = os.path.join(interp_path, "fgbg")
+        interp_path_stats = os.path.join(interp_path, stats_filename)
+        interp_path_arg = os.path.join(interp_path, "fgbg")
+        if os.path.isfile(interp_path_stats): interp_path_arg = interp_path_stats
         module = "pytorch_fid"
 
-        cmd = ["python", "-m", module, interp_path_fgbg, linear_path_fgbg]
+        cmd = ["python", "-m", module, interp_path_arg, linear_path_arg]
         flags = ["--device", f"cuda:{rank}", "--num-workers", "4"]
         cmd += flags
         output = subprocess.check_output(cmd).decode("utf-8")
         fid_linear = float(output.split()[-1])
-        cmd = ["python", "-m", module, interp_path_fgbg, planar_path_fgbg]
+        cmd = ["python", "-m", module, interp_path_arg, planar_path_arg]
         flags = ["--device", f"cuda:{rank}", "--num-workers", "4"]
         cmd += flags
         output = subprocess.check_output(cmd).decode("utf-8")
